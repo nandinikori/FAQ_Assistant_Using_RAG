@@ -1,0 +1,253 @@
+[
+
+    {
+        "question": "What is PostgreSQL?",
+        "answer": "PostgreSQL is a free and open-source relational database system used to store, organize, and manage data."
+    },
+
+    {
+        "question": "What is SQL?",
+        "answer": "SQL stands for Structured Query Language. It is used to work with data stored in databases."
+    },
+
+    {
+        "question": "What is a database?",
+        "answer": "A database is an organized collection of information that can be stored, searched, and managed by a computer system."
+    },
+
+    {
+        "question": "What is a table in a database?",
+        "answer": "A table is a structure inside a database that stores information using rows and columns."
+    },
+
+    {
+        "question": "What is a row?",
+        "answer": "A row represents one complete record in a database table."
+    },
+
+    {
+        "question": "What is a column?",
+        "answer": "A column represents one type or category of information stored in a database table."
+    },
+
+    {
+        "question": "What is a primary key?",
+        "answer": "A primary key is a column that uniquely identifies each row in a database table."
+    },
+
+    {
+        "question": "What is an index?",
+        "answer": "An index is a database structure that helps the database find information more efficiently."
+    },
+
+    {
+        "question": "What is SELECT in SQL?",
+        "answer": "SELECT is an SQL command used to read or retrieve data from a database."
+    },
+
+    {
+        "question": "What is INSERT in SQL?",
+        "answer": "INSERT is an SQL command used to add new records to a database table."
+    },
+
+    {
+        "question": "What is UPDATE in SQL?",
+        "answer": "UPDATE is an SQL command used to change existing data in a database table."
+    },
+
+    {
+        "question": "What is DELETE in SQL?",
+        "answer": "DELETE is an SQL command used to remove records from a database table."
+    },
+
+    {
+        "question": "What is Python?",
+        "answer": "Python is a popular programming language known for its simple syntax and use in software development, data science, and AI."
+    },
+
+    {
+        "question": "What is a variable in Python?",
+        "answer": "A variable is a name used to store a value in a Python program."
+    },
+
+    {
+        "question": "What is a Python function?",
+        "answer": "A function is a reusable block of Python code that performs a particular task."
+    },
+
+    {
+        "question": "What is a Python list?",
+        "answer": "A Python list is a collection that can store multiple values in a single variable."
+    },
+
+    {
+        "question": "What is a Python dictionary?",
+        "answer": "A Python dictionary stores information as key-value pairs."
+    },
+
+    {
+        "question": "What is programming?",
+        "answer": "Programming is the process of writing instructions that tell a computer what to do."
+    },
+
+    {
+        "question": "What is a programming language?",
+        "answer": "A programming language is a language used by programmers to write instructions that computers can execute."
+    },
+
+    {
+        "question": "What is an API?",
+        "answer": "An API is a way for one software application to communicate with another software application."
+    },
+
+    {
+        "question": "What is an API key?",
+        "answer": "An API key is a piece of information used by an application to identify or authenticate access to an API."
+    },
+
+    {
+        "question": "What is Artificial Intelligence?",
+        "answer": "Artificial Intelligence, or AI, is technology that allows computers to perform tasks that normally require human-like intelligence."
+    },
+
+    {
+        "question": "What is Machine Learning?",
+        "answer": "Machine Learning is a part of AI where computers learn patterns from data and use those patterns to make predictions or decisions."
+    },
+
+    {
+        "question": "What is an AI model?",
+        "answer": "An AI model is a computer system that has learned patterns from data and can perform tasks such as generating text or making predictions."
+    },
+
+    {
+        "question": "What is Natural Language Processing?",
+        "answer": "Natural Language Processing, or NLP, is a field of AI that helps computers work with human language."
+    },
+
+    {
+        "question": "What is text generation?",
+        "answer": "Text generation is the process of using an AI model to create human-readable text from an input."
+    },
+
+    {
+        "question": "What is an embedding?",
+        "answer": "An embedding is a list of numbers that represents information such as text in a form that an AI system can process."
+    },
+
+    {
+        "question": "What is a vector?",
+        "answer": "A vector is a list of numbers. In AI applications, vectors can be used to represent information such as the meaning of text."
+    },
+
+    {
+        "question": "Why do we use embeddings?",
+        "answer": "Embeddings allow computers to represent the meaning of information as numbers so that similar information can be compared."
+    },
+
+    {
+        "question": "How does text become an embedding?",
+        "answer": "An embedding model takes text as input and converts it into a list of numbers that represents information about the text."
+    },
+
+    {
+        "question": "What is a vector database?",
+        "answer": "A vector database is a database system designed to store and search vector representations of information."
+    },
+
+    {
+        "question": "What is pgvector?",
+        "answer": "pgvector is a PostgreSQL extension that allows PostgreSQL to store and search vector data."
+    },
+
+    {
+        "question": "Why use pgvector with PostgreSQL?",
+        "answer": "pgvector allows PostgreSQL to store normal data together with vector data and perform similarity searches."
+    },
+
+    {
+        "question": "What is semantic search?",
+        "answer": "Semantic search finds information based on meaning instead of only looking for exact matching words."
+    },
+
+    {
+        "question": "How is semantic search different from keyword search?",
+        "answer": "Keyword search mainly looks for matching words, while semantic search uses embeddings to compare the meaning of information."
+    },
+
+    {
+        "question": "What is similarity search?",
+        "answer": "Similarity search finds information whose vector representation is similar to the vector representation of the user's question."
+    },
+
+    {
+        "question": "Why are vectors useful for search?",
+        "answer": "Vectors allow information to be represented as numbers so that a system can compare the similarity between different pieces of information."
+    },
+
+    {
+        "question": "What is RAG?",
+        "answer": "RAG stands for Retrieval-Augmented Generation. It retrieves relevant information and gives that information to an AI model to generate an answer."
+    },
+
+    {
+        "question": "How does RAG work?",
+        "answer": "RAG first searches a knowledge source for relevant information and then gives the retrieved information to an AI model before generating the final answer."
+    },
+
+    {
+        "question": "Why do we use RAG?",
+        "answer": "RAG allows an AI application to use information retrieved from a knowledge source when generating an answer."
+    },
+
+    {
+        "question": "What is a RAG application?",
+        "answer": "A RAG application is an AI application that retrieves relevant information from a knowledge source and uses that information to generate an answer."
+    },
+
+    {
+        "question": "What is a prompt?",
+        "answer": "A prompt is an instruction or question given to an AI model."
+    },
+
+    {
+        "question": "What is a language model?",
+        "answer": "A language model is an AI model that can process and generate human language."
+    },
+
+    {
+        "question": "What is Gemini?",
+        "answer": "Gemini is a family of AI models from Google that can be used for tasks such as understanding and generating content."
+    },
+
+    {
+        "question": "What is Docker?",
+        "answer": "Docker is a technology used to package applications and their dependencies into containers."
+    },
+
+    {
+        "question": "What is a Docker container?",
+        "answer": "A Docker container is an isolated environment that contains an application and the components it needs to run."
+    },
+
+    {
+        "question": "What is cloud computing?",
+        "answer": "Cloud computing means using computing resources such as servers and storage over the internet."
+    },
+
+    {
+        "question": "What is data?",
+        "answer": "Data is information that can be stored, processed, and analyzed by a computer."
+    },
+
+    {
+        "question": "Why do AI applications need databases?",
+        "answer": "AI applications can use databases to store information, retrieve useful data, and provide information to AI models."
+    },
+
+    {
+        "question": "How can PostgreSQL be used in an AI application?",
+        "answer": "PostgreSQL can store application data and, with pgvector, can also store and search vector embeddings for AI applications."
+    }
+
+]
