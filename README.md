@@ -12,6 +12,7 @@ Traditional keyword search fails when users ask questions with different wording
 
 - FAQ dataset ingestion from JSON into PostgreSQL
 - Gemini embedding generation for each FAQ and user question
+- Gemini-generated, Markdown-formatted answers grounded in retrieved FAQs
 - pgvector similarity search using cosine distance
 - modular Python package structure
 - CLI for ingesting data and asking questions
@@ -51,6 +52,7 @@ ai_faq_assistant/
 │   │   └── retrieval.py
 │   ├── services/
 │   │   ├── __init__.py
+│   │   ├── AI_assistant_service.py
 │   │   ├── faq_ingestion_service.py
 │   │   └── rag_service.py
 ├── data/
@@ -121,6 +123,7 @@ Create a `.env` file in the project root based on `.env.example`:
 
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_TEXT_MODEL=gemini-2.5-flash
 DB_HOST=localhost
 DB_NAME=ai_workshop
 DB_USER=postgres
@@ -154,8 +157,15 @@ python main.py
 The CLI menu supports:
 
 1. Ingest FAQ data into PostgreSQL
-2. Ask a semantic question against the FAQ database
-3. Exit
+2. Retrieve and display matching FAQs without AI generation
+3. Ask Gemini to format an answer using retrieved FAQ context
+4. Exit
+
+To run the sample batch of FAQ questions and one open-ended question:
+
+```bash
+python -m app.services.AI_assistant_service
+```
 
 ## Data flow
 

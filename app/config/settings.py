@@ -27,6 +27,7 @@ class Settings:
     db_user: str = "postgres"
     db_password: str = "postgres"
     app_env: str = "development"
+    gemini_text_model: str = "gemini-3.5-flash-lite"
 
     def validate(self) -> None:
         if not self.gemini_api_key:
@@ -42,6 +43,7 @@ def get_settings() -> Settings:
         db_user=os.getenv("DB_USER", "postgres"),
         db_password=os.getenv("DB_PASSWORD", "postgres"),
         app_env=os.getenv("APP_ENV", "development"),
+        gemini_text_model=os.getenv("GEMINI_TEXT_MODEL", "gemini-3.5-flash-lite"),
     )
     settings.validate()
     return settings

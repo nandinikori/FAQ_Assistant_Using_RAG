@@ -6,9 +6,9 @@ workflow to run:
 
 1. Data ingestion: load the FAQ dataset and store it in PostgreSQL with vector
    embeddings for semantic search.
-2. Retrieval: accept a user question, find the closest FAQ matches, and return
-   the most relevant answer context.
-3. Exit: stop the program cleanly.
+2. RAG retrieval: find and display the closest FAQ matches.
+3. AI answer: ask Gemini to compose an answer using the retrieved FAQ context.
+4. Exit: stop the program cleanly.
 
 The goal of this file is to keep the operational flow simple for both local
 usage and portfolio demonstration while delegating the real work to the
@@ -20,6 +20,7 @@ from pathlib import Path
 from app.config.settings import get_settings
 from app.infrastructure.database import DatabaseClient
 from app.infrastructure.embedding_client import GeminiEmbeddingClient
+from app.services.AI_assistant_service import AIAssistantService
 from app.services.faq_ingestion_service import FAQIngestionService
 from app.services.rag_service import RAGService
 
@@ -30,8 +31,9 @@ def show_menu() -> None:
     """Display the available user actions in a simple command-line menu."""
     print("\n=== AI FAQ Assistant Menu ===")
     print("1. Ingest FAQ data into PostgreSQL")
-    print("2. Ask a question and retrieve FAQ matches")
-    print("3. Exit")
+    print("2. RAG retrieval: show matching FAQs")
+    print("3. Ask AI: generate an answer from retrieved FAQs")
+    print("4. Exit")
     print("=============================")
 
 
@@ -66,21 +68,44 @@ def handle_ingestion(settings: object) -> None:
 
 
 def handle_retrieval(settings: object) -> None:
-    """Accept a user question and return the best matching FAQ answers."""
+    """Retrieve and display FAQ matches without generating an AI answer."""
     rag_service = RAGService(settings)
 
-    # Prompt the user for free-text input. If it is empty, use a sensible default.
     question = input("\nEnter your question: ").strip()
     if not question:
         question = "How can computers understand the meaning of text?"
 
-    print(f"\nSearching for relevant FAQ matches for: '{question}'")
     try:
-        answer = rag_service.answer_question(question)
-        print("\nRetrieved answer:")
-        print(answer)
+        matches = rag_service.retrieve(question)
+        if not matches:
+            print("No matching FAQs were found.")
+            return
+
+        print("\nRetrieved FAQ matches:")
+        for rank, match in enumerate(matches, start=1):
+            print(f"\n{rank}. {match['question']}")
+            print(f"   Answer: {match['answer']}")
+            if match.get("category"):
+                print(f"   Category: {match['category']}")
+            if match.get("similarity") is not None:
+                print(f"   Similarity: {float(match['similarity']):.3f}")
     except Exception as exc:
         print(f"Retrieval failed: {exc}")
+
+
+def handle_ai_answer(settings: object) -> None:
+    """Generate a formatted AI answer grounded in retrieved FAQ matches."""
+    assistant = AIAssistantService(settings)
+    question = input("\nEnter your question: ").strip()
+    if not question:
+        question = "How can computers understand the meaning of text?"
+
+    try:
+        answer = assistant.ask_ai(question)
+        print("\nAI:")
+        print(answer)
+    except Exception as exc:
+        print(f"AI answer failed: {exc}")
 
 
 def main() -> None:
@@ -103,17 +128,19 @@ def main() -> None:
     # to perform next without restarting the script each time.
     while True:
         show_menu()
-        choice = input("Select an option [1-3]: ").strip().lower()
+        choice = input("Select an option [1-4]: ").strip().lower()
 
         if choice == "1":
             handle_ingestion(settings)
         elif choice == "2":
             handle_retrieval(settings)
-        elif choice in {"3", "exit", "quit"}:
+        elif choice == "3":
+            handle_ai_answer(settings)
+        elif choice in {"4", "exit", "quit"}:
             print("Goodbye! Thanks for using the AI FAQ Assistant.")
             break
         else:
-            print("Invalid choice. Please enter 1, 2, or 3.")
+            print("Invalid choice. Please enter 1, 2, 3, or 4.")
 
 
 if __name__ == "__main__":

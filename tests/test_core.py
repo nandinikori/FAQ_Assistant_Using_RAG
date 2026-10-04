@@ -5,8 +5,10 @@ import pytest
 from app.config.settings import Settings
 from app.domain.faq import FAQ
 from app.infrastructure.faq_repository import FAQRepository
+from app.services.AI_assistant_service import AIAssistantService, NO_MATCH_MESSAGE
 from app.services.faq_ingestion_service import FAQIngestionService
 from app.services.rag_service import RAGService
+from main import handle_ai_answer, handle_retrieval, show_menu
 
 
 def test_settings_validate_requires_api_key():
@@ -146,7 +148,96 @@ def test_rag_service_returns_relevant_faq_context():
     service.embedding_client = FakeEmbeddingClient()
     service.repository = FakeRepository()
 
-    answer = service.answer_question("How can I store records efficiently?")
+    context = service.get_context("How can I store records efficiently?")
 
-    assert "What is a database?" in answer
-    assert "A database stores structured information." in answer
+    assert "What is a database?" in context
+    assert "A database stores structured information." in context
+
+
+def test_ask_ai_generates_answer_from_retrieved_context():
+    class FakeRAGService:
+        def get_context(self, question):
+            assert question == "What is PostgreSQL?"
+            return "Q: What is PostgreSQL?\nA: PostgreSQL is a relational database."
+
+    class FakeModels:
+        def generate_content(self, model, contents):
+            assert model == "test-model"
+            assert "PostgreSQL is a relational database" in contents
+            return type("Response", (), {"text": "**PostgreSQL** is a relational database."})()
+
+    class FakeClient:
+        models = FakeModels()
+
+    settings = Settings(gemini_api_key="test-key", gemini_text_model="test-model")
+    assistant = AIAssistantService(settings, FakeRAGService(), FakeClient())
+
+    assert assistant.ask_ai("What is PostgreSQL?") == "**PostgreSQL** is a relational database."
+
+
+def test_ask_ai_does_not_generate_when_no_context_is_found():
+    class FakeRAGService:
+        def get_context(self, question):
+            return ""
+
+    class FakeClient:
+        models = None
+
+    settings = Settings(gemini_api_key="test-key")
+    assistant = AIAssistantService(settings, FakeRAGService(), FakeClient())
+
+    assert assistant.ask_ai("What is PostgreSQL?") == NO_MATCH_MESSAGE
+
+
+def test_retrieval_menu_handler_prints_matches_without_ai(monkeypatch, capsys):
+    class FakeRAGService:
+        def __init__(self, settings):
+            pass
+
+        def retrieve(self, question):
+            assert question == "What is PostgreSQL?"
+            return [{
+                "question": "What is PostgreSQL?",
+                "answer": "PostgreSQL is a relational database.",
+                "category": "database",
+                "similarity": 0.91,
+            }]
+
+    monkeypatch.setattr("main.RAGService", FakeRAGService)
+    monkeypatch.setattr("builtins.input", lambda prompt: "What is PostgreSQL?")
+
+    handle_retrieval(object())
+
+    output = capsys.readouterr().out
+    assert "Retrieved FAQ matches:" in output
+    assert "PostgreSQL is a relational database." in output
+    assert "Similarity: 0.910" in output
+    assert "AI:" not in output
+
+
+def test_ai_menu_handler_prints_generated_answer(monkeypatch, capsys):
+    class FakeAssistant:
+        def __init__(self, settings):
+            pass
+
+        def ask_ai(self, question):
+            assert question == "What is PostgreSQL?"
+            return "**PostgreSQL** is a relational database."
+
+    monkeypatch.setattr("main.AIAssistantService", FakeAssistant)
+    monkeypatch.setattr("builtins.input", lambda prompt: "What is PostgreSQL?")
+
+    handle_ai_answer(object())
+
+    output = capsys.readouterr().out
+    assert "AI:" in output
+    assert "**PostgreSQL** is a relational database." in output
+
+
+def test_menu_shows_four_workflow_choices(capsys):
+    show_menu()
+
+    output = capsys.readouterr().out
+    assert "2. RAG retrieval" in output
+    assert "3. Ask AI" in output
+    assert "4. Exit" in output

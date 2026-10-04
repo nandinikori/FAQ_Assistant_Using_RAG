@@ -25,15 +25,12 @@ class RAGService:
         embedding = self.embedding_client.generate_embedding(question)
         return self.repository.search_similar(embedding, limit=limit)
 
-    def answer_question(self, question: str) -> str:
+    def get_context(self, question: str) -> str:
         matches = self.retrieve(question, limit=3)
         if not matches:
-            return "I could not find a relevant FAQ in the current knowledge base."
+            return ""
 
         context = "\n\n".join(
             f"Q: {row['question']}\nA: {row['answer']}" for row in matches
         )
-        return (
-            "Based on the retrieved FAQs, here is the answer:\n\n"
-            f"{context}"
-        )
+        return context
