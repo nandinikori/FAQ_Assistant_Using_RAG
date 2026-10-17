@@ -1,0 +1,38 @@
+{
+  "documents": [
+    {
+      "document_id": "remote-work",
+      "version": "1.0",
+      "source_path": "remote_work_v1.md",
+      "metadata": {
+        "document_type": "synthetic-policy",
+        "effective_date": "2025-01-01",
+        "owner": "People Operations",
+        "classification": "internal"
+      }
+    },
+    {
+      "document_id": "remote-work",
+      "version": "2.0",
+      "source_path": "remote_work_v2.md",
+      "metadata": {
+        "document_type": "synthetic-policy",
+        "effective_date": "2026-04-01",
+        "owner": "People Operations",
+        "classification": "internal",
+        "supersedes": "1.0"
+      }
+    },
+    {
+      "document_id": "travel-expense",
+      "version": "1.0",
+      "source_path": "travel_expense_v1.md",
+      "metadata": {
+        "document_type": "synthetic-policy",
+        "effective_date": "2025-07-01",
+        "owner": "Finance",
+        "classification": "internal"
+      }
+    }
+  ]
+}
