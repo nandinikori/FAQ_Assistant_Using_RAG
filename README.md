@@ -4,9 +4,28 @@ A modular PostgreSQL + pgvector + Gemini RAG project for semantic FAQ search and
 
 This project stores FAQ records in PostgreSQL, generates embeddings with Gemini, and performs similarity search using pgvector so users can query the knowledge base by meaning rather than exact keyword match.
 
+<a id="contents"></a>
+## Contents and day-by-day progress
+
+| Section | Overview / progress |
+| --- | --- |
+| [Why this project exists](#why-this-project-exists) | Motivation for semantic FAQ search. |
+| [Features](#features) | Main project capabilities. |
+| [Tech stack](#tech-stack) | Languages, services, and libraries used. |
+| [Project structure](#project-structure) | Repository layout. |
+| [Prerequisites](#prerequisites) | Required software and credentials. |
+| [Local setup](#local-setup) | Installation and configuration steps. |
+| [Run the application](#run-the-application) | How to start the CLI. |
+| [Data flow](#data-flow) | High-level RAG pipeline. |
+| [Testing](#testing) | Test suite and how to run it. |
+| [Notes for public GitHub use](#notes-for-public-github-use) | Credential and repository guidance. |
+| [Development progress](#development-progress) — [Day 1](#day-1) | **Basic FAQ RAG baseline:** JSON ingestion, Gemini embeddings, PostgreSQL/pgvector semantic retrieval, and context-based answer generation through a CLI. |
+
 ## Why this project exists
 
 Traditional keyword search fails when users ask questions with different wording than the source content. This assistant uses embeddings to convert both the FAQ and the user question into vectors and then finds the closest semantic matches in PostgreSQL.
+
+[Back to index](#contents)
 
 ## Features
 
@@ -18,6 +37,8 @@ Traditional keyword search fails when users ask questions with different wording
 - CLI for ingesting data and asking questions
 - production-oriented project layout for portfolio and GitHub use
 
+[Back to index](#contents)
+
 ## Tech stack
 
 - Python 3.13+
@@ -26,6 +47,8 @@ Traditional keyword search fails when users ask questions with different wording
 - Google Gemini embeddings
 - psycopg2
 - Python-dotenv
+
+[Back to index](#contents)
 
 ## Project structure
 
@@ -74,6 +97,8 @@ ai_faq_assistant/
 └── uv.lock
 ```
 
+[Back to index](#contents)
+
 ## Prerequisites
 
 Before running the project, make sure you have:
@@ -82,6 +107,8 @@ Before running the project, make sure you have:
 2. PostgreSQL installed and running
 3. pgvector enabled in your database
 4. A Gemini API key
+
+[Back to index](#contents)
 
 ## Local setup
 
@@ -146,6 +173,8 @@ Then create the knowledge base if needed:
 CREATE DATABASE ai_workshop;
 ```
 
+[Back to index](#contents)
+
 ## Run the application
 
 From the project root:
@@ -167,6 +196,8 @@ To run the sample batch of FAQ questions and one open-ended question:
 python -m app.services.AI_assistant_service
 ```
 
+[Back to index](#contents)
+
 ## Data flow
 
 ```text
@@ -182,6 +213,8 @@ Similarity search by embedding distance
     ↓
 RAGService response generation
 ```
+
+[Back to index](#contents)
 
 ## Testing
 
@@ -199,6 +232,8 @@ The tests cover:
 - repository insert logic
 - service behavior for retrieval and answer assembly
 
+[Back to index](#contents)
+
 ## Notes for public GitHub use
 
 - Keep your `.env` file local and never commit secrets.
@@ -206,15 +241,11 @@ The tests cover:
 - Keep database credentials out of version control.
 - This repository is structured as a clean demo/portfolio project rather than a throwaway notebook.
 
+[Back to index](#contents)
+
 ## Development progress
 
 This section records the repository's implementation as it evolves. Each entry describes capabilities present at that stage; planned capabilities are not counted as completed work.
-
-| Day | Milestone | Summary |
-| --- | --- | --- |
-| [Day 1](#day-1) | Basic FAQ RAG baseline | JSON ingestion, Gemini embeddings, PostgreSQL/pgvector semantic retrieval, and context-based answer generation through a CLI. |
-
-GitHub README files do not support interactive tabs, so each Day link jumps to its matching section below. Add future days as separate sections with a matching anchor (for example, `day-2`).
 
 <a id="day-1"></a>
 ### Day 1 — Basic FAQ RAG baseline
@@ -275,3 +306,5 @@ A modular implementation of one dense-retrieval RAG pattern, from data ingestion
 - Hybrid retrieval, reranking, source citations, tenant authorization, and document version management are not implemented.
 - There is no published retrieval/answer-quality benchmark, production monitoring, or load-test evidence.
 - Existing unit tests do not establish real database integration correctness or end-to-end answer quality. This progress entry is based on source review; no application execution or benchmark was performed for this update.
+
+[Back to index](#contents)
