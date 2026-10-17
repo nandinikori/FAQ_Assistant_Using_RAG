@@ -448,20 +448,38 @@ Every document carries a stable document ID, version, source name, and manifest 
 #### Enterprise architecture mapping
 
 ```mermaid
-flowchart LR
-    A["Source registry and versioned files"] --> B["Ingestion adapter"]
-    B --> C["Parse, normalize, classify"]
-    C --> D["Canonical blocks + provenance"]
-    D --> E["Strategy registry and chunking"]
-    E --> F["Chunk validation and evaluation"]
-    F --> G["Embedding provider"]
-    G --> H["Versioned chunk store + vector index"]
-    H --> I["Filtered retrieval"]
-    I --> J["Parent expansion, reranking, citations"]
-    J --> K["RAG response"]
-    B -. "audit, retries, metrics" .-> L["Pipeline observability"]
-    F -. "strategy/version metrics" .-> L
-    I -. "retrieval feedback" .-> L
+flowchart TB
+    subgraph INGEST["1. Ingest and prepare"]
+        direction LR
+        SOURCE["Source registry<br/>Versioned documents"] --> ADAPTER["Ingestion<br/>adapter"]
+        ADAPTER --> PARSE["Parse<br/>Normalize<br/>Classify"]
+        PARSE --> BLOCKS["Canonical blocks<br/>+ provenance"]
+    end
+
+    subgraph INDEX["2. Chunk and index"]
+        direction LR
+        STRATEGY["Strategy registry<br/>+ chunking"] --> VALIDATE["Chunk validation<br/>+ evaluation"]
+        VALIDATE --> EMBED["Embedding<br/>provider"]
+        EMBED --> STORE["Versioned chunk store<br/>+ vector index"]
+    end
+
+    subgraph SERVE["3. Retrieve and answer"]
+        direction LR
+        SEARCH["Authorized<br/>filtered retrieval"] --> EXPAND["Parent expansion<br/>Rerank + citations"]
+        EXPAND --> RESPONSE["RAG response"]
+    end
+
+    BLOCKS --> STRATEGY
+    STORE --> SEARCH
+
+    subgraph CONTROLS["Cross-cutting observability"]
+        direction LR
+        AUDIT["Audit events<br/>Retries"] --- METRICS["Metrics<br/>Evaluation"]
+    end
+
+    ADAPTER -.-> AUDIT
+    VALIDATE -.-> METRICS
+    SEARCH -.-> METRICS
 ```
 
 The implementation in this repository covers the versioned corpus, Markdown parsing, chunking strategies, source lineage, deterministic IDs, and offline chunk-shape metrics. The remaining boxes describe enterprise integration points, not features claimed as already implemented. In production, source adapters publish versioned ingestion jobs; parsing and embedding workers are idempotent and retryable; chunk records retain source/version/strategy/model metadata; vector retrieval applies tenant and document-version authorization filters; child hits expand to parent context; and metrics, audit events, and human-reviewed relevance judgments feed evaluation. The legacy FAQ database schema and runtime are not yet aligned for a single production deployment, so this chunking demo intentionally runs without PostgreSQL or API credentials.
