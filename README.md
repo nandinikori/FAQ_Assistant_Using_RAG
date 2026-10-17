@@ -205,3 +205,73 @@ The tests cover:
 - Use `.env.example` as the template for contributors.
 - Keep database credentials out of version control.
 - This repository is structured as a clean demo/portfolio project rather than a throwaway notebook.
+
+## Development progress
+
+This section records the repository's implementation as it evolves. Each entry describes capabilities present at that stage; planned capabilities are not counted as completed work.
+
+| Day | Milestone | Summary |
+| --- | --- | --- |
+| [Day 1](#day-1) | Basic FAQ RAG baseline | JSON ingestion, Gemini embeddings, PostgreSQL/pgvector semantic retrieval, and context-based answer generation through a CLI. |
+
+GitHub README files do not support interactive tabs, so each Day link jumps to its matching section below. Add future days as separate sections with a matching anchor (for example, `day-2`).
+
+<a id="day-1"></a>
+### Day 1 — Basic FAQ RAG baseline
+
+The starting implementation demonstrates the complete retrieval-augmented generation flow: load a knowledge source, retrieve relevant information by meaning, and provide that information to a language model to answer a question.
+
+#### What is implemented
+
+- **Ingestion:** load FAQ question–answer pairs from JSON and generate an embedding for each combined pair.
+- **Storage:** persist FAQ content and embeddings in PostgreSQL with pgvector.
+- **Retrieval:** embed the user's question and rank FAQ records using cosine distance. The retrieval interface defaults to five results; answer generation uses three.
+- **Generation:** supply retrieved FAQ text to Gemini with instructions to answer from that information and avoid inventing facts.
+- **Empty-context handling:** return a no-match message without generating an answer when no context is available.
+- **Application structure:** separate configuration, domain models, database access, ingestion, retrieval, and application services.
+- **Usage and testing:** provide an interactive CLI, a Dockerfile, setup instructions, and unit tests covering selected repository and service behavior with fake dependencies.
+
+#### How the baseline works
+
+```mermaid
+flowchart TD
+    A["FAQ JSON"] --> B["Embed question-answer pairs"]
+    B --> C["PostgreSQL and pgvector"]
+    D["User question"] --> E["Embed the question"]
+    E --> F["Rank FAQ records by cosine distance"]
+    C --> F
+    F --> G["Assemble the top three FAQs"]
+    G --> H["Generate an answer with Gemini"]
+```
+
+#### Concept at a glance
+
+```mermaid
+mindmap
+  root((Day 1 RAG))
+    Knowledge
+      FAQ question-answer pairs
+      JSON ingestion
+    Embeddings
+      Represent text numerically
+      Compare semantic similarity
+    Retrieval
+      PostgreSQL and pgvector
+      Nearest FAQ matches
+    Generation
+      Retrieved text as context
+      Gemini answer
+```
+
+#### What this baseline establishes
+
+A modular implementation of one dense-retrieval RAG pattern, from data ingestion to generated answers. Each FAQ pair acts as a natural retrieval unit; document chunking is not implemented at this stage.
+
+#### Current limitations
+
+- Retrieval returns the nearest records without a calibrated relevance or evidence-sufficiency check. Nonempty context can still be unrelated to the question.
+- Repeated ingestion can create duplicate records: the method named `upsert` currently performs inserts.
+- The SQL setup and application-created schema differ; the Docker Python version also differs from the project requirement.
+- Hybrid retrieval, reranking, source citations, tenant authorization, and document version management are not implemented.
+- There is no published retrieval/answer-quality benchmark, production monitoring, or load-test evidence.
+- Existing unit tests do not establish real database integration correctness or end-to-end answer quality. This progress entry is based on source review; no application execution or benchmark was performed for this update.
