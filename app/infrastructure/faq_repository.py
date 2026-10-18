@@ -36,6 +36,12 @@ class FAQRepository:
                 cur.execute(
                     """
                     ALTER TABLE faq
+                    ADD COLUMN IF NOT EXISTS category TEXT;
+                    """
+                )
+                cur.execute(
+                    """
+                    ALTER TABLE faq
                     ADD COLUMN IF NOT EXISTS embedding VECTOR;
                     """
                 )

@@ -28,10 +28,21 @@ class Settings:
     db_password: str = "postgres"
     app_env: str = "development"
     gemini_text_model: str = "gemini-3.5-flash-lite"
+    gemini_embedding_model: str = "gemini-embedding-001"
+    embedding_dimensions: int = 3072
+    embedding_configuration_version: str = "gemini-embedding-v1"
 
     def validate(self) -> None:
         if not self.gemini_api_key:
             raise ValueError("GEMINI_API_KEY is missing. Create a .env file with your API key.")
+        if (
+            not isinstance(self.embedding_dimensions, int)
+            or isinstance(self.embedding_dimensions, bool)
+            or self.embedding_dimensions < 1
+        ):
+            raise ValueError("EMBEDDING_DIMENSIONS must be a positive integer.")
+        if not self.gemini_embedding_model or not self.embedding_configuration_version:
+            raise ValueError("Embedding model and configuration version must be set.")
 
 
 def get_settings() -> Settings:
@@ -44,6 +55,13 @@ def get_settings() -> Settings:
         db_password=os.getenv("DB_PASSWORD", "postgres"),
         app_env=os.getenv("APP_ENV", "development"),
         gemini_text_model=os.getenv("GEMINI_TEXT_MODEL", "gemini-3.5-flash-lite"),
+        gemini_embedding_model=os.getenv(
+            "GEMINI_EMBEDDING_MODEL", "gemini-embedding-001"
+        ),
+        embedding_dimensions=int(os.getenv("EMBEDDING_DIMENSIONS", "3072")),
+        embedding_configuration_version=os.getenv(
+            "EMBEDDING_CONFIGURATION_VERSION", "gemini-embedding-v1"
+        ),
     )
     settings.validate()
     return settings

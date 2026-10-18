@@ -30,6 +30,7 @@ def _chunk(
     char_start: int,
     char_end: int,
     ordinal: int,
+    source_blocks: Sequence[SourceBlock],
     *,
     parent_chunk_id: str | None = None,
     metadata: dict | None = None,
@@ -37,7 +38,7 @@ def _chunk(
 ) -> DocumentChunk:
     overlapping = [
         block
-        for block in parse_markdown(document)
+        for block in source_blocks
         if block.char_start < char_end and block.char_end > char_start
     ]
     path = next(
@@ -79,6 +80,7 @@ def _block_chunk(
     block: SourceBlock,
     strategy: str,
     ordinal: int,
+    source_blocks: Sequence[SourceBlock],
     *,
     text: str | None = None,
     char_start: int | None = None,
@@ -92,6 +94,7 @@ def _block_chunk(
         block.char_start if char_start is None else char_start,
         block.char_end if char_end is None else char_end,
         ordinal,
+        source_blocks,
         metadata=metadata,
     )
     return DocumentChunk(
@@ -108,6 +111,7 @@ def _table_row_chunks(
     max_tokens: int,
     strategy: str,
     ordinal_start: int,
+    source_blocks: Sequence[SourceBlock],
 ) -> list[DocumentChunk]:
     header = str(block.metadata["table_header"])
     header_tokens = _token_count(header)
@@ -120,9 +124,10 @@ def _table_row_chunks(
                 block,
                 strategy,
                 ordinal_start,
+                source_blocks,
                 metadata={
                     "table_headers": block.metadata["headers"],
-                    "max_tokens": max_tokens,
+                    "configured_max_tokens": max_tokens,
                 },
             )
         ]
@@ -135,9 +140,10 @@ def _table_row_chunks(
         if batch_rows and batch_tokens + row_tokens > max_tokens:
             chunks.append(
                 _emit_table_batch(
-                    document, block, header, rows, spans, batch_rows, strategy,
+                document, block, header, rows, spans, batch_rows, max_tokens, strategy,
                     ordinal_start + len(chunks),
-                )
+                source_blocks,
+            )
             )
             batch_rows = []
             batch_tokens = header_tokens
@@ -147,8 +153,9 @@ def _table_row_chunks(
     if batch_rows:
         chunks.append(
             _emit_table_batch(
-                document, block, header, rows, spans, batch_rows, strategy,
+                document, block, header, rows, spans, batch_rows, max_tokens, strategy,
                 ordinal_start + len(chunks),
+                source_blocks,
             )
         )
     return chunks
@@ -161,8 +168,10 @@ def _emit_table_batch(
     rows: list[str],
     spans: list[tuple[int, int]],
     indices: list[int],
+    max_tokens: int,
     strategy: str,
     ordinal: int,
+    source_blocks: Sequence[SourceBlock],
 ) -> DocumentChunk:
     first, last = indices[0], indices[-1]
     text = "\n".join([header, *(rows[index] for index in indices)])
@@ -171,6 +180,7 @@ def _emit_table_batch(
         block,
         strategy,
         ordinal,
+        source_blocks,
         text=text,
         char_start=spans[first][0],
         char_end=spans[last][1],
@@ -185,9 +195,7 @@ def _emit_table_batch(
             "table_row_start": first + 1,
             "table_row_end": last + 1,
             "repeated_table_header": True,
-            "max_tokens": _token_count(header) + sum(
-                _token_count(rows[index]) for index in indices
-            ),
+            "configured_max_tokens": max_tokens,
         },
     )
 
@@ -214,7 +222,12 @@ class TokenWindowChunker:
         self.overlap = overlap
         self.token_spans = token_spans
 
-    def chunk(self, document: Document) -> list[DocumentChunk]:
+    def chunk(
+        self,
+        document: Document,
+        source_blocks: Sequence[SourceBlock] | None = None,
+    ) -> list[DocumentChunk]:
+        blocks = parse_markdown(document) if source_blocks is None else source_blocks
         spans = (
             list(self.token_spans(document.content))
             if self.token_spans is not None
@@ -238,6 +251,7 @@ class TokenWindowChunker:
                     first[0],
                     last[1],
                     ordinal,
+                    blocks,
                     metadata={
                         "configured_chunk_size": self.chunk_size,
                         "configured_overlap": self.overlap,
@@ -263,8 +277,12 @@ class ParagraphChunker:
             raise ValueError("max_tokens must be positive.")
         self.max_tokens = max_tokens
 
-    def chunk(self, document: Document) -> list[DocumentChunk]:
-        blocks = parse_markdown(document)
+    def chunk(
+        self,
+        document: Document,
+        source_blocks: Sequence[SourceBlock] | None = None,
+    ) -> list[DocumentChunk]:
+        blocks = parse_markdown(document) if source_blocks is None else source_blocks
         chunks: list[DocumentChunk] = []
         pending: list[SourceBlock] = []
         pending_tokens = 0
@@ -282,7 +300,8 @@ class ParagraphChunker:
                     first.char_start,
                     last.char_end,
                     len(chunks),
-                    metadata={"max_tokens": self.max_tokens},
+                    blocks,
+                    metadata={"configured_max_tokens": self.max_tokens},
                 )
             )
             pending, pending_tokens = [], 0
@@ -292,7 +311,8 @@ class ParagraphChunker:
                 flush()
                 chunks.extend(
                     _table_row_chunks(
-                        document, block, self.max_tokens, "paragraph", len(chunks)
+                        document, block, self.max_tokens, "paragraph", len(chunks),
+                        blocks,
                     )
                 )
                 continue
@@ -307,8 +327,11 @@ class ParagraphChunker:
                 if piece_tokens > self.max_tokens:
                     chunks.append(
                         _chunk(
-                            document, "paragraph", piece, start, end, len(chunks),
-                            metadata={"oversized_atomic_sentence": True},
+                            document, "paragraph", piece, start, end, len(chunks), blocks,
+                            metadata={
+                                "oversized_atomic_sentence": True,
+                                "configured_max_tokens": self.max_tokens,
+                            },
                         )
                     )
                 else:
@@ -382,7 +405,13 @@ class RecursiveChunker:
         self.max_tokens = max_tokens
         self.separators = tuple(separators)
 
-    def chunk(self, document: Document) -> list[DocumentChunk]:
+    def chunk(
+        self,
+        document: Document,
+        source_blocks: Sequence[SourceBlock] | None = None,
+    ) -> list[DocumentChunk]:
+        blocks = parse_markdown(document) if source_blocks is None else source_blocks
+
         def split(start: int, end: int, separator_index: int) -> list[tuple[int, int]]:
             text = document.content[start:end]
             if _token_count(text) <= self.max_tokens:
@@ -440,8 +469,9 @@ class RecursiveChunker:
                 start,
                 end,
                 ordinal,
+                blocks,
                 metadata={
-                    "max_tokens": self.max_tokens,
+                    "configured_max_tokens": self.max_tokens,
                     "separators": list(self.separators),
                     "fallback": "token-offset-splitting",
                 },
@@ -458,8 +488,12 @@ class StructureAwareChunker:
             raise ValueError("max_tokens must be positive.")
         self.max_tokens = max_tokens
 
-    def chunk(self, document: Document) -> list[DocumentChunk]:
-        blocks = parse_markdown(document)
+    def chunk(
+        self,
+        document: Document,
+        source_blocks: Sequence[SourceBlock] | None = None,
+    ) -> list[DocumentChunk]:
+        blocks = parse_markdown(document) if source_blocks is None else source_blocks
         chunks: list[DocumentChunk] = []
         pending: list[SourceBlock] = []
         pending_tokens = 0
@@ -477,9 +511,10 @@ class StructureAwareChunker:
                     first.char_start,
                     last.char_end,
                     len(chunks),
+                    blocks,
                     metadata={
                         "block_kinds": [item.kind for item in pending],
-                        "max_tokens": self.max_tokens,
+                        "configured_max_tokens": self.max_tokens,
                     },
                 )
             )
@@ -495,6 +530,7 @@ class StructureAwareChunker:
                         self.max_tokens,
                         "structure-aware",
                         len(chunks),
+                        blocks,
                     )
                 )
                 continue
@@ -512,9 +548,10 @@ class StructureAwareChunker:
                         block,
                         "structure-aware",
                         len(chunks),
+                        blocks,
                         metadata={
                             "oversized_atomic_block": True,
-                            "max_tokens": self.max_tokens,
+                            "configured_max_tokens": self.max_tokens,
                         },
                     )
                 )
@@ -533,18 +570,31 @@ class TableAwareChunker:
             raise ValueError("max_tokens must be positive.")
         self.max_tokens = max_tokens
 
-    def chunk(self, document: Document) -> list[DocumentChunk]:
+    def chunk(
+        self,
+        document: Document,
+        source_blocks: Sequence[SourceBlock] | None = None,
+    ) -> list[DocumentChunk]:
+        blocks = parse_markdown(document) if source_blocks is None else source_blocks
         chunks: list[DocumentChunk] = []
-        for block in parse_markdown(document):
+        for block in blocks:
             if block.kind == "table":
                 chunks.extend(
                     _table_row_chunks(
-                        document, block, self.max_tokens, "table-aware", len(chunks)
+                        document, block, self.max_tokens, "table-aware", len(chunks),
+                        blocks,
                     )
                 )
             elif block.kind != "heading":
                 chunks.append(
-                    _block_chunk(document, block, "table-aware", len(chunks))
+                    _block_chunk(
+                        document,
+                        block,
+                        "table-aware",
+                        len(chunks),
+                        blocks,
+                        metadata={"configured_max_tokens": self.max_tokens},
+                    )
                 )
         return chunks
 
@@ -566,30 +616,36 @@ class SemanticChunker:
         self.threshold = threshold
         self.max_tokens = max_tokens
 
-    def chunk(self, document: Document) -> list[DocumentChunk]:
+    def chunk(
+        self,
+        document: Document,
+        source_blocks: Sequence[SourceBlock] | None = None,
+    ) -> list[DocumentChunk]:
+        blocks = parse_markdown(document) if source_blocks is None else source_blocks
         chunks: list[DocumentChunk] = []
         pending: list[SourceBlock] = []
         pending_tokens = 0
-        for block in parse_markdown(document):
+        for block in blocks:
             if block.kind == "heading":
                 if pending:
-                    self._flush(document, pending, chunks)
+                    self._flush(document, pending, chunks, blocks)
                     pending, pending_tokens = [], 0
                 continue
             if block.kind == "table":
                 if pending:
-                    self._flush(document, pending, chunks)
+                    self._flush(document, pending, chunks, blocks)
                     pending, pending_tokens = [], 0
                 chunks.extend(
                     _table_row_chunks(
-                        document, block, self.max_tokens, "semantic", len(chunks)
+                        document, block, self.max_tokens, "semantic", len(chunks),
+                        blocks,
                     )
                 )
                 continue
             block_tokens = _tokens(block.text)
             if len(block_tokens) > self.max_tokens:
                 if pending:
-                    self._flush(document, pending, chunks)
+                    self._flush(document, pending, chunks, blocks)
                     pending, pending_tokens = [], 0
                 for start in range(0, len(block_tokens), self.max_tokens):
                     end = min(start + self.max_tokens, len(block_tokens))
@@ -604,9 +660,10 @@ class SemanticChunker:
                             source_start,
                             source_end,
                             len(chunks),
+                            blocks,
                             metadata={
                                 "boundary_signal": "token-limit-fallback",
-                                "max_tokens": self.max_tokens,
+                                "configured_max_tokens": self.max_tokens,
                             },
                             token_count=end - start,
                         )
@@ -617,19 +674,19 @@ class SemanticChunker:
                 or pending_tokens + len(block_tokens) > self.max_tokens
             )
             if should_split:
-                self._flush(document, pending, chunks)
+                self._flush(document, pending, chunks, blocks)
                 pending, pending_tokens = [], 0
             if pending:
                 similarity = self.similarity(pending[-1].text, block.text)
                 if not -1 <= similarity <= 1:
                     raise ValueError("similarity callback must return a score from -1 to 1.")
                 if similarity < self.threshold:
-                    self._flush(document, pending, chunks)
+                    self._flush(document, pending, chunks, blocks)
                     pending, pending_tokens = [], 0
             pending.append(block)
             pending_tokens += len(block_tokens)
         if pending:
-            self._flush(document, pending, chunks)
+            self._flush(document, pending, chunks, blocks)
         return chunks
 
     def _flush(
@@ -637,6 +694,7 @@ class SemanticChunker:
         document: Document,
         pending: Sequence[SourceBlock],
         chunks: list[DocumentChunk],
+        source_blocks: Sequence[SourceBlock],
     ) -> None:
         first, last = pending[0], pending[-1]
         chunks.append(
@@ -647,10 +705,11 @@ class SemanticChunker:
                 first.char_start,
                 last.char_end,
                 len(chunks),
+                source_blocks,
                 metadata={
                     "boundary_signal": "injected-similarity-callback",
                     "threshold": self.threshold,
-                    "max_tokens": self.max_tokens,
+                    "configured_max_tokens": self.max_tokens,
                 },
             )
         )
@@ -661,6 +720,7 @@ def parent_child_chunks(
     parent_max_tokens: int = 240,
     child_size: int = 80,
     child_overlap: int = 10,
+    source_blocks: Sequence[SourceBlock] | None = None,
 ) -> list[DocumentChunk]:
     """Build larger contextual parents and overlapping retrieval children."""
     if child_size < 1 or child_overlap < 0 or child_overlap >= child_size:
@@ -668,13 +728,14 @@ def parent_child_chunks(
     if parent_max_tokens < child_size:
         raise ValueError("parent_max_tokens must be >= child_size.")
 
-    parents = StructureAwareChunker(parent_max_tokens).chunk(document)
+    blocks = parse_markdown(document) if source_blocks is None else source_blocks
+    parents = StructureAwareChunker(parent_max_tokens).chunk(document, blocks)
     results: list[DocumentChunk] = []
-    source_blocks = {block.block_id: block for block in parse_markdown(document)}
+    blocks_by_id = {block.block_id: block for block in blocks}
     emitted_tables: set[str] = set()
     for parent_index, parent in enumerate(parents):
         if parent.metadata.get("table_headers"):
-            table_block = source_blocks[parent.source_block_ids[0]]
+            table_block = blocks_by_id[parent.source_block_ids[0]]
             if table_block.block_id in emitted_tables:
                 continue
             emitted_tables.add(table_block.block_id)
@@ -683,6 +744,7 @@ def parent_child_chunks(
                 table_block,
                 "parent-child-parent",
                 parent_index,
+                blocks,
                 metadata={
                     "role": "parent",
                     "table_headers": table_block.metadata["headers"],
@@ -718,6 +780,7 @@ def parent_child_chunks(
                 source_start,
                 source_end,
                 parent_index * 10000 + child_index,
+                blocks,
                 parent_chunk_id=parent.chunk_id,
                 metadata={
                     "role": "child",
