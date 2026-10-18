@@ -21,6 +21,7 @@ This project stores FAQ records in PostgreSQL, generates embeddings with Gemini,
 | [Notes for public GitHub use](#notes-for-public-github-use) | Credential and repository guidance. |
 | [Development progress](#development-progress) — [Day 1](#day-1) | **Basic FAQ RAG baseline:** JSON ingestion, Gemini embeddings, PostgreSQL/pgvector semantic retrieval, and context-based answer generation through a CLI. |
 | [Day 2 — Document ingestion and chunking](#day-2-progress) | **Progress:** versioned synthetic policies, seven chunking strategies, provenance, and offline structural comparison. |
+| [Day 3 — Persistent document ingestion and retrieval](#day-3-progress) | **Verified:** idempotent PostgreSQL/pgvector chunk storage, provenance-aware retrieval, explicit version filters, and real database integration tests. |
 
 ## Why this project exists
 
@@ -37,6 +38,7 @@ Traditional keyword search fails when users ask questions with different wording
 - modular Python package structure
 - CLI for ingesting data and asking questions
 - document parsing and chunking strategy comparison with source provenance
+- versioned document-chunk ingestion and provenance-aware pgvector retrieval
 - production-oriented project layout for portfolio and GitHub use
 
 [Back to index](#contents)
@@ -75,10 +77,12 @@ ai_faq_assistant/
 │   ├── infrastructure/
 │   │   ├── __init__.py
 │   │   ├── database.py
+│   │   ├── document_chunk_repository.py
 │   │   ├── embedding_client.py
 │   │   └── faq_repository.py
 │   ├── ingestion/
 │   │   ├── __init__.py
+│   │   ├── document_ingestion.py
 │   │   └── ingestion.py
 │   ├── retrieval/
 │   │   ├── __init__.py
@@ -99,10 +103,14 @@ ai_faq_assistant/
 │   ├── 001_enable_pgvector.sql
 │   ├── 002_create_faq_table.sql
 │   ├── 003_vector_search.sql
-│   └── 004_insert_sample_faqs.sql
+│   ├── 004_insert_sample_faqs.sql
+│   └── 005_create_document_chunks.sql
 ├── tests/
 │   ├── test_chunking.py
-│   └── test_core.py
+│   ├── test_core.py
+│   ├── test_document_storage.py
+│   └── integration/
+│       └── test_document_postgres.py
 ├── .env.example
 ├── .gitignore
 ├── Dockerfile
@@ -167,6 +175,9 @@ Create a `.env` file in the project root based on `.env.example`:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_TEXT_MODEL=gemini-2.5-flash
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+EMBEDDING_DIMENSIONS=3072
+EMBEDDING_CONFIGURATION_VERSION=gemini-embedding-v1
 DB_HOST=localhost
 DB_NAME=ai_workshop
 DB_USER=postgres
@@ -464,6 +475,95 @@ flowchart LR
     I -. "retrieval feedback" .-> L
 ```
 
-The implementation in this repository covers the versioned corpus, Markdown parsing, chunking strategies, source lineage, deterministic IDs, and offline chunk-shape metrics. The remaining boxes describe enterprise integration points, not features claimed as already implemented. In production, source adapters publish versioned ingestion jobs; parsing and embedding workers are idempotent and retryable; chunk records retain source/version/strategy/model metadata; vector retrieval applies tenant and document-version authorization filters; child hits expand to parent context; and metrics, audit events, and human-reviewed relevance judgments feed evaluation. The legacy FAQ database schema and runtime are not yet aligned for a single production deployment, so this chunking demo intentionally runs without PostgreSQL or API credentials.
+The Day 2 implementation covered the versioned corpus, Markdown parsing, chunking strategies, source lineage, deterministic IDs, and offline chunk-shape metrics. The remaining boxes describe enterprise integration points, not features claimed as already implemented. Day 3 below adds persistent chunk storage, document retrieval, and a real PostgreSQL/pgvector integration test; tenant authorization, parent expansion, reranking, and retrieval-quality evaluation remain out of scope.
+
+<a id="day-3-progress"></a>
+### Day 3 — Persistent document ingestion and retrieval
+
+**Day 3 outcome:** policy chunks now have a persistent PostgreSQL/pgvector contract, are idempotently ingested, and can be retrieved with provenance and an explicit version filter. FAQ storage and the existing FAQ RAG methods remain available.
+
+#### Storage and identity contract
+
+Each `document_chunks` row stores:
+
+- Document ID, immutable document version, source name, stable chunk ID, exact chunk text, and a SHA-256 content hash.
+- Chunking strategy and configuration JSON, including the configured token limit; `token_count` is the emitted chunk's measured count from its tokenizer (the default tokenizer is a lexical approximation), not the configured limit.
+- Zero-based source character offsets, one-based source lines, heading path, source block IDs, and optional parent chunk ID.
+- Embedding vector, model name, dimensions, and embedding configuration version.
+
+Chunk identity is deterministic from document ID/version, strategy, boundaries, parent identity, emitted text, and the serialized chunk metadata/configuration. Changing the chunker configuration changes the ID, so experiment rows do not overwrite each other. The storage key also includes embedding model, dimensions, and configuration version. Inserts use `ON CONFLICT DO NOTHING`; an unchanged re-ingest reuses its existing vectors. The default 3,072 dimensions match the Gemini embedding model's existing FAQ vectors. The configured vector dimension is checked before database writes and against the installed column type. A dimension change requires a separate compatible database/schema rather than mixing vectors.
+
+All missing chunk embeddings are generated and checked before any rows from that batch are written. A failed embedding raises `ChunkIngestionError` with affected chunk IDs and aborts the batch. Database inserts then run in a single transaction. A changed source must use a new document version; old versions and alternate chunker experiments are retained.
+
+#### Ingestion and retrieval flow
+
+```mermaid
+flowchart TD
+    A["Versioned Markdown document"] --> B["Parse once + chunk"]
+    B --> C["Stable IDs + source provenance"]
+    C --> D{"Already stored for this embedding config?"}
+    D -->|"Yes"| G["Keep existing chunk"]
+    D -->|"No"| E["Embed and validate dimensions"]
+    E --> F["Atomic PostgreSQL insert"]
+    G --> H["Version/model-filtered chunk table"]
+    F --> H
+    Q["Question"] --> I["Embed with same configured model/dimensions"]
+    I --> J["pgvector cosine retrieval"]
+    H --> J
+    J --> K["Chunks, similarity, and source provenance"]
+```
+
+The original FAQ workflow still uses `RAGService.retrieve()` and `get_context()`. Document search is exposed as `RAGService.retrieve_document_chunks()`, with optional `document_id` and `document_version` filters.
+
+#### Run it
+
+From the `ai_faq_assistant` project directory, configure `.env` as shown above, start PostgreSQL with pgvector, and apply the schema migrations (the repository also ensures runtime schemas):
+
+```bash
+psql -h localhost -U postgres -d ai_workshop -f sql/001_enable_pgvector.sql -f sql/002_create_faq_table.sql -f sql/005_create_document_chunks.sql
+```
+
+Ingest both policy versions, then repeat one command to check idempotency:
+
+```bash
+python -m app.ingestion.document_ingestion --document-id remote-work --version 1.0
+python -m app.ingestion.document_ingestion --document-id remote-work --version 2.0
+python -m app.ingestion.document_ingestion --document-id remote-work --version 2.0
+```
+
+The repeated command reports zero new chunks and the existing chunk count. Retrieve only version 2.0 (the returned dictionaries include source name, offsets, lines, heading path, hash, and similarity):
+
+```bash
+python -c "from app.config.settings import get_settings; from app.services.rag_service import RAGService; print(RAGService(get_settings()).retrieve_document_chunks('How many days may remote employees work from home?', document_id='remote-work', document_version='2.0'))"
+```
+
+Run the unit suite with:
+
+```bash
+python -m pytest -q
+```
+
+The PostgreSQL integration test is opt-in and uses the configured database; it uses a deterministic test embedding so it does not call Gemini:
+
+```powershell
+$env:RUN_POSTGRES_INTEGRATION_TESTS = "1"
+python -m pytest tests/integration/test_document_postgres.py -q
+Remove-Item Env:\RUN_POSTGRES_INTEGRATION_TESTS
+```
+
+#### Verified results
+
+- `python -m pytest -q`: **28 passed, 1 skipped** (the PostgreSQL test is opt-in).
+- With `RUN_POSTGRES_INTEGRATION_TESTS=1`, `python -m pytest -q` reports **29 passed** against the local PostgreSQL/pgvector instance. It verified duplicate ingestion leaves row counts and IDs unchanged, a changed chunking configuration is stored separately, both policy versions are stored, a version-2.0 query excludes version 1.0, a wrong-sized embedding is rejected before insertion, source text/line metadata and parent IDs round-trip, and FAQ insertion/retrieval still works.
+
+The integration embedding is deterministic and deliberately identical across chunks; it verifies the PostgreSQL/pgvector persistence and filter contract, not Gemini behavior, semantic ranking quality, or production-scale relevance.
+
+#### Remaining limitations
+
+- The ingestion CLI currently reads the included Markdown policy manifest; PDF, HTML, arbitrary file adapters, and source-change detection are not implemented.
+- The integration test does not call the external embedding API. Live Gemini connectivity and answer quality are not established by this test.
+- The configured embedding dimension is a table-level contract. Use a separate schema/database when changing dimensions; model/configuration versions with the same dimension remain isolated by query filters.
+- Retrieval currently uses exact pgvector distance without an ANN index, and does not select one chunking strategy/configuration when multiple experiments are stored.
+- Tenant authorization, stale-version cleanup, parent expansion, reranking, and labeled retrieval evaluation are not implemented.
 
 [Back to index](#contents)

@@ -16,6 +16,9 @@ class GeminiEmbeddingClient:
 
     def __init__(self, settings: Settings):
         self.settings = settings
+        self.model = settings.gemini_embedding_model
+        self.dimensions = settings.embedding_dimensions
+        self.configuration_version = settings.embedding_configuration_version
         if not settings.gemini_api_key:
             raise ValueError("GEMINI_API_KEY is missing. Add it to your .env file.")
 
@@ -30,8 +33,11 @@ class GeminiEmbeddingClient:
 
         client = genai.Client(api_key=self.settings.gemini_api_key)
         response = client.models.embed_content(
-            model="gemini-embedding-001",
+            model=self.model,
             contents=text,
+            config=genai.types.EmbedContentConfig(
+                output_dimensionality=self.dimensions
+            ),
         )
 
         embeddings = getattr(response, "embeddings", None)
