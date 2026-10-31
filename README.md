@@ -1,8 +1,8 @@
 # AI FAQ Assistant
 
-A modular PostgreSQL + pgvector + Gemini RAG project for semantic FAQ search and retrieval.
+I attended an NPTEL workshop on Retrieval-Augmented Generation (RAG), then enhanced this repository to illustrate how a RAG application can be built and how different chunking and retrieval methodologies can be compared.
 
-This project stores FAQ records in PostgreSQL, generates embeddings with Gemini, and performs similarity search using pgvector so users can query the knowledge base by meaning rather than exact keyword match.
+The project keeps its original FAQ assistant while adding a versioned policy-document pipeline using PostgreSQL, pgvector, and Gemini embeddings. Day 3 focuses on reliable storage and filtered retrieval; Day 4 compares dense, lexical, hybrid, and reranked retrieval against labeled evidence.
 
 <a id="contents"></a>
 ## Contents and day-by-day progress
@@ -22,6 +22,7 @@ This project stores FAQ records in PostgreSQL, generates embeddings with Gemini,
 | [Development progress](#development-progress) — [Day 1](#day-1) | **Basic FAQ RAG baseline:** JSON ingestion, Gemini embeddings, PostgreSQL/pgvector semantic retrieval, and context-based answer generation through a CLI. |
 | [Day 2 — Document ingestion and chunking](#day-2-progress) | **Progress:** versioned synthetic policies, seven chunking strategies, provenance, and offline structural comparison. |
 | [Day 3 — Persistent document ingestion and retrieval](#day-3-progress) | **Verified:** idempotent PostgreSQL/pgvector chunk storage, provenance-aware retrieval, explicit version filters, and real database integration tests. |
+| [Day 4 — Chunking and retrieval evaluation](#day-4-progress) | **Evaluation:** dense, BM25 lexical, RRF hybrid, and embedding reranking across seven chunking strategies. |
 
 ## Why this project exists
 
@@ -39,6 +40,7 @@ Traditional keyword search fails when users ask questions with different wording
 - CLI for ingesting data and asking questions
 - document parsing and chunking strategy comparison with source provenance
 - versioned document-chunk ingestion and provenance-aware pgvector retrieval
+- labeled comparison of dense, BM25, RRF hybrid, and embedding-reranked retrieval
 - production-oriented project layout for portfolio and GitHub use
 
 [Back to index](#contents)
@@ -86,6 +88,7 @@ ai_faq_assistant/
 │   │   └── ingestion.py
 │   ├── retrieval/
 │   │   ├── __init__.py
+│   │   ├── evaluation.py
 │   │   └── retrieval.py
 │   ├── services/
 │   │   ├── __init__.py
@@ -96,6 +99,7 @@ ai_faq_assistant/
 │   ├── faqs.json
 │   └── policies/
 │       ├── manifest.json
+│       ├── retrieval_eval_queries.json
 │       ├── remote_work_v1.md
 │       ├── remote_work_v2.md
 │       └── travel_expense_v1.md
@@ -109,6 +113,8 @@ ai_faq_assistant/
 │   ├── test_chunking.py
 │   ├── test_core.py
 │   ├── test_document_storage.py
+│   ├── test_retrieval.py
+│   ├── test_retrieval_evaluation.py
 │   └── integration/
 │       └── test_document_postgres.py
 ├── .env.example
@@ -475,12 +481,35 @@ flowchart LR
     I -. "retrieval feedback" .-> L
 ```
 
-The Day 2 implementation covered the versioned corpus, Markdown parsing, chunking strategies, source lineage, deterministic IDs, and offline chunk-shape metrics. The remaining boxes describe enterprise integration points, not features claimed as already implemented. Day 3 below adds persistent chunk storage, document retrieval, and a real PostgreSQL/pgvector integration test; tenant authorization, parent expansion, reranking, and retrieval-quality evaluation remain out of scope.
+The Day 2 implementation covered the versioned corpus, Markdown parsing, chunking strategies, source lineage, deterministic IDs, and offline chunk-shape metrics. The remaining boxes describe enterprise integration points, not features claimed as already implemented. Day 3 below adds persistent chunk storage, document retrieval, and a real PostgreSQL/pgvector integration test. Day 4 adds application-level BM25, RRF, and embedding reranking plus labeled retrieval evaluation; tenant authorization, production parent expansion, and production-scale relevance guarantees remain out of scope.
 
 <a id="day-3-progress"></a>
 ### Day 3 — Persistent document ingestion and retrieval
 
-**Day 3 outcome:** policy chunks now have a persistent PostgreSQL/pgvector contract, are idempotently ingested, and can be retrieved with provenance and an explicit version filter. FAQ storage and the existing FAQ RAG methods remain available.
+**Day 3 in one sentence:** persist versioned chunks safely, then retrieve them with provenance and explicit document/version filters. The original FAQ storage and retrieval workflow remains unchanged.
+
+#### Quick path
+
+1. Configure `.env` and start PostgreSQL with pgvector.
+2. Apply the schema scripts (runtime schema creation is also supported).
+3. Ingest a policy version; repeat the command to verify idempotency.
+4. Retrieve against an explicit document version and inspect the returned source offsets.
+
+```mermaid
+flowchart LR
+    S["Versioned Markdown source"] --> P["Parse and chunk"]
+    P --> I["Stable chunk IDs + provenance"]
+    I --> E{"Already stored for this embedding configuration?"}
+    E -->|"Yes"| V["Reuse stored chunk"]
+    E -->|"No"| G["Embed and validate"]
+    G --> DB["Atomic PostgreSQL + pgvector write"]
+    V --> R["Version/model-filtered chunks"]
+    DB --> R
+    Q["Question + optional document/version filter"] --> QE["Embed question"]
+    QE --> NN["pgvector cosine top-k search"]
+    R --> NN
+    NN --> O["Chunk text, score, provenance"]
+```
 
 #### Storage and identity contract
 
@@ -495,25 +524,9 @@ Chunk identity is deterministic from document ID/version, strategy, boundaries, 
 
 All missing chunk embeddings are generated and checked before any rows from that batch are written. A failed embedding raises `ChunkIngestionError` with affected chunk IDs and aborts the batch. Database inserts then run in a single transaction. A changed source must use a new document version; old versions and alternate chunker experiments are retained.
 
-#### Ingestion and retrieval flow
-
-```mermaid
-flowchart TD
-    A["Versioned Markdown document"] --> B["Parse once + chunk"]
-    B --> C["Stable IDs + source provenance"]
-    C --> D{"Already stored for this embedding config?"}
-    D -->|"Yes"| G["Keep existing chunk"]
-    D -->|"No"| E["Embed and validate dimensions"]
-    E --> F["Atomic PostgreSQL insert"]
-    G --> H["Version/model-filtered chunk table"]
-    F --> H
-    Q["Question"] --> I["Embed with same configured model/dimensions"]
-    I --> J["pgvector cosine retrieval"]
-    H --> J
-    J --> K["Chunks, similarity, and source provenance"]
-```
-
 The original FAQ workflow still uses `RAGService.retrieve()` and `get_context()`. Document search is exposed as `RAGService.retrieve_document_chunks()`, with optional `document_id` and `document_version` filters.
+
+**What Day 3 guarantees:** repeatable chunk identity, idempotent writes, configured embedding isolation, explicit version filtering, and source provenance. The default document retrieval remains dense cosine search; callers can optionally filter by chunking strategy.
 
 #### Run it
 
@@ -563,7 +576,83 @@ The integration embedding is deterministic and deliberately identical across chu
 - The ingestion CLI currently reads the included Markdown policy manifest; PDF, HTML, arbitrary file adapters, and source-change detection are not implemented.
 - The integration test does not call the external embedding API. Live Gemini connectivity and answer quality are not established by this test.
 - The configured embedding dimension is a table-level contract. Use a separate schema/database when changing dimensions; model/configuration versions with the same dimension remain isolated by query filters.
-- Retrieval currently uses exact pgvector distance without an ANN index, and does not select one chunking strategy/configuration when multiple experiments are stored.
-- Tenant authorization, stale-version cleanup, parent expansion, reranking, and labeled retrieval evaluation are not implemented.
+- Dense retrieval uses exact pgvector distance without an ANN index.
+- Tenant authorization, stale-version cleanup, and production parent expansion are not implemented. Day 4 adds selectable BM25, RRF, and embedding reranking for document chunks; these remain an application-level workshop implementation, not a claim of production scaling or answer-quality validation.
+
+[Back to index](#contents)
+
+<a id="day-4-progress"></a>
+### Day 4 — Chunking and retrieval evaluation
+
+Day 4 compares **seven chunking strategies** and **four retrieval methodologies** against a fixed set of policy questions with source-anchored required evidence. It is an offline benchmark, not a production retrieval change.
+
+#### Evaluation flow
+
+```mermaid
+flowchart TD
+    A["Versioned policy corpus"] --> B["Chunk with each of 7 strategies"]
+    Q["Fixed question set + required evidence"] --> D["Filter to labeled document/version"]
+    B --> C["Embed chunks with configured Gemini model"]
+    D --> E["Dense cosine ranking"]
+    D --> F["BM25 lexical ranking"]
+    C --> E
+    E --> G["Reciprocal Rank Fusion (RRF)"]
+    F --> G
+    E --> H["Dense top candidates"]
+    F --> H
+    H --> I["Contextualized embedding reranker"]
+    E --> J["Evaluate top-k evidence"]
+    F --> J
+    G --> J
+    I --> J
+    J --> K["Hit@k · evidence recall · MRR"]
+    K --> L["JSON report + fingerprints"]
+```
+
+#### Compared retrieval methodologies
+
+| Method | First stage / scoring | What it illustrates |
+| --- | --- | --- |
+| **Dense** | Rank chunks by cosine similarity between Gemini question and chunk embeddings. | Semantic retrieval when wording differs from the policy. |
+| **BM25** | Okapi BM25 term matching, calculated locally over chunks from the selected document version. | Lexical retrieval for exact terms, names, and values; no additional package or service. |
+| **RRF hybrid** | Fuse the dense and BM25 ranked lists using `1 / (60 + rank)`. Raw scores are never mixed. | Rank-based fusion of semantic and lexical retrievers. |
+| **Embedding rerank (implemented)** | Form a candidate pool from the top 20 dense and BM25 results, then re-score that pool by embedding cosine using a passage representation that includes its heading path. | A simple second-stage baseline. It is not a cross-encoder and does not jointly score the query and passage. |
+| **Cross-encoder rerank (not implemented)** | A cross-encoder model receives each `(query, candidate passage)` pair together and predicts a relevance score; use it to rerank a smaller candidate pool from dense, BM25, or RRF retrieval. | Unlike embedding cosine, self-attention across the joined query/passage can model token-level interactions and often improves ranking quality, at the cost of a model dependency and per-candidate inference latency. This repository does **not** currently load or call a cross-encoder. |
+
+Each of the four implemented methodologies runs against each chunking strategy, for 28 strategy/method combinations. Evaluation belongs in [`app/retrieval/evaluation.py`](./app/retrieval/evaluation.py) because it measures ranking quality and imports reusable algorithms from [`app/retrieval/retrieval.py`](./app/retrieval/retrieval.py); chunking code remains focused on producing chunks and structural diagnostics. The retrieval package therefore owns both retrieval implementations and their quality benchmark, while reusing the chunking strategies and corpus as inputs. Parent–child ranks only child chunks and checks required evidence in the linked parent context in the benchmark. Semantic chunking also uses configured-embedding cosine as its boundary signal. All methods use the same fixed labeled query set and a version-restricted candidate corpus. Cross-encoder reranking is described as a possible next method, but is not part of this benchmark or application implementation.
+
+Select a method from Python (dense is the backward-compatible default):
+
+```python
+from app.config.settings import get_settings
+from app.services.rag_service import RAGService
+
+rag_service = RAGService(get_settings())
+matches = rag_service.retrieve_document_chunks(
+    "What are the domestic lodging limits?",
+    document_id="travel-expense",
+    document_version="1.0",
+    method="rrf",             # "dense", "bm25", "rrf", or "rerank"
+    strategy="table-aware",   # optional filter to one stored chunking strategy
+    limit=5,
+    candidate_limit=1000,     # bounded candidate pool for lexical/hybrid methods
+)
+```
+
+BM25 runs over the repository's bounded candidate set; filter by document, version, or strategy to define a focused retrieval collection. RRF fuses independent dense and BM25 rankings using the default constant 60. Reranking forms a candidate union from dense and BM25, then re-scores the candidates using the configured embedding model and heading-prefixed passage text. Non-dense results include `retrieval_method` and `retrieval_score`; dense results retain their existing similarity output. The methods do not alter the FAQ search path.
+
+Run from the project root with a configured Gemini API key:
+
+```bash
+python -m app.retrieval.evaluation
+```
+
+The command prints a JSON report. Save a copy as well with `--output day4-evaluation.json`, or change the evaluation cutoff with `--top-k 5`. The fixed questions and required evidence are in [`data/policies/retrieval_eval_queries.json`](./data/policies/retrieval_eval_queries.json).
+
+The comparison uses an 80-token target for retrieval chunks (12-token overlap for token windows), the same corpus and embedding configuration for every strategy, and a configurable top-k cutoff. Exact repeated input text is embedded only once per run.
+
+The report includes, for every strategy/method combination, `Hit@k` (all required evidence phrases for a question are present), `evidence_recall@k` (fraction present), and `MRR@k` (reciprocal rank of the first required evidence phrase). It also includes per-query ranks, top chunks/scores, retrieval chunk counts, method settings, embedding model/configuration, and SHA-256 fingerprints of the corpus, labels, and generated embedding inputs/vectors. Combinations are ordered by Hit@k, evidence recall, MRR, then fewer retrieval chunks. The reported winner therefore means “best on this fixed synthetic dataset and these settings,” not universally best.
+
+The evaluation itself is in-memory and does not write experiment rows to PostgreSQL. The same BM25, RRF, and reranker implementations are available for application document retrieval through `RAGService`; selecting those methods requires no change to default dense or FAQ retrieval. The evaluation requires API credentials and network access. BM25 and RRF are deterministic for the same corpus/query inputs; embedding results can change with provider behavior, even when the recorded model/configuration is unchanged. The bundled tests use discriminative fake embeddings to verify routing and ranking mechanics; they do not claim semantic quality. PostgreSQL integration tests continue to validate storage and filtering rather than retrieval relevance.
 
 [Back to index](#contents)
