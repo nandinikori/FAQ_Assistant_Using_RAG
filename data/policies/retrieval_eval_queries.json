@@ -1,0 +1,78 @@
+[
+  {
+    "id": "remote-work-v1-remote-days",
+    "question": "How many days per week may an eligible employee work remotely under version 1.0?",
+    "document_id": "remote-work",
+    "document_version": "1.0",
+    "required_evidence": [
+      "up to two days per week",
+      "with manager approval"
+    ]
+  },
+  {
+    "id": "remote-work-v2-remote-days",
+    "question": "How many days per week may an eligible employee work remotely under version 2.0?",
+    "document_id": "remote-work",
+    "document_version": "2.0",
+    "required_evidence": [
+      "up to three days each week",
+      "after onboarding and manager approval"
+    ]
+  },
+  {
+    "id": "remote-work-v2-core-hours",
+    "question": "When must remote employees be reachable under the current policy?",
+    "document_id": "remote-work",
+    "document_version": "2.0",
+    "required_evidence": [
+      "during team core hours agreed in writing by the manager"
+    ]
+  },
+  {
+    "id": "remote-work-v1-exception-approval",
+    "question": "Who may approve a temporary remote-work exception, and what is one qualifying reason?",
+    "document_id": "remote-work",
+    "document_version": "1.0",
+    "required_evidence": [
+      "People Operations may approve a temporary exception",
+      "disability accommodation"
+    ]
+  },
+  {
+    "id": "remote-work-v2-exception-expiration",
+    "question": "What additional information must be included in an approved temporary exception under version 2.0?",
+    "document_id": "remote-work",
+    "document_version": "2.0",
+    "required_evidence": [
+      "review date, and expiration date"
+    ]
+  },
+  {
+    "id": "travel-expense-tier-b-limit",
+    "question": "What are the lodging and meal reimbursement ceilings for international tier B?",
+    "document_id": "travel-expense",
+    "document_version": "1.0",
+    "required_evidence": [
+      "International tier B | USD 240 | USD 70 | USD 25"
+    ]
+  },
+  {
+    "id": "travel-expense-receipts",
+    "question": "When are receipts required under the travel and expense policy?",
+    "document_id": "travel-expense",
+    "document_version": "1.0",
+    "required_evidence": [
+      "for every lodging claim",
+      "above the stated threshold"
+    ]
+  },
+  {
+    "id": "travel-expense-report-deadline",
+    "question": "How soon after a trip must an expense report be submitted?",
+    "document_id": "travel-expense",
+    "document_version": "1.0",
+    "required_evidence": [
+      "within 15 calendar days after the trip"
+    ]
+  }
+]

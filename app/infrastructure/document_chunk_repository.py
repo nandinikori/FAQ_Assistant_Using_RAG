@@ -209,6 +209,7 @@ class DocumentChunkRepository:
         limit: int = 5,
         document_id: str | None = None,
         document_version: str | None = None,
+        strategy: str | None = None,
     ) -> list[dict[str, Any]]:
         """Return nearest chunks, optionally restricted to a document/version."""
         if limit < 1:
@@ -235,6 +236,9 @@ class DocumentChunkRepository:
         if document_version is not None:
             filters.append("document_version = %s")
             params.append(document_version)
+        if strategy is not None:
+            filters.append("strategy = %s")
+            params.append(strategy)
         query_params = [vector, *params, vector, limit]
         query = f"""
             SELECT chunk_id, document_id, document_version, source_name,
@@ -251,4 +255,50 @@ class DocumentChunkRepository:
         with self.database_client.connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(query, tuple(query_params))
+                return cur.fetchall()
+
+    def list_candidates(
+        self,
+        limit: int = 1000,
+        document_id: str | None = None,
+        document_version: str | None = None,
+        strategy: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Load a bounded, configuration-filtered pool for lexical retrieval."""
+        if limit < 1:
+            raise ValueError("limit must be positive.")
+        filters = [
+            "embedding_model = %s",
+            "embedding_dimensions = %s",
+            "embedding_configuration_version = %s",
+        ]
+        params: list[Any] = [
+            self.settings.gemini_embedding_model,
+            self.settings.embedding_dimensions,
+            self.settings.embedding_configuration_version,
+        ]
+        if document_id is not None:
+            filters.append("document_id = %s")
+            params.append(document_id)
+        if document_version is not None:
+            filters.append("document_version = %s")
+            params.append(document_version)
+        if strategy is not None:
+            filters.append("strategy = %s")
+            params.append(strategy)
+        params.append(limit)
+        query = f"""
+            SELECT chunk_id, document_id, document_version, source_name,
+                   strategy, chunking_configuration, text, content_hash,
+                   token_count, source_char_start, source_char_end,
+                   source_line_start, source_line_end, heading_path,
+                   source_block_ids, parent_chunk_id, metadata
+            FROM document_chunks
+            WHERE {" AND ".join(filters)}
+            ORDER BY chunk_id
+            LIMIT %s;
+        """
+        with self.database_client.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, tuple(params))
                 return cur.fetchall()
