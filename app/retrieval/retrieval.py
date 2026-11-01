@@ -8,6 +8,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, Protocol
 
+from app.chunking.configuration import validate_chunking_configuration
 from app.infrastructure.database import DatabaseClient
 
 RetrievalMethod = Literal["dense", "bm25", "rrf", "rerank"]
@@ -27,6 +28,9 @@ class DocumentChunkSearchRepository(Protocol):
         document_id: str | None = None,
         document_version: str | None = None,
         strategy: str | None = None,
+        chunking_configuration: Mapping[str, Any] | None = None,
+        document_ids: Sequence[str] | None = None,
+        document_versions: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]: ...
 
     def list_candidates(
@@ -35,6 +39,9 @@ class DocumentChunkSearchRepository(Protocol):
         document_id: str | None = None,
         document_version: str | None = None,
         strategy: str | None = None,
+        chunking_configuration: Mapping[str, Any] | None = None,
+        document_ids: Sequence[str] | None = None,
+        document_versions: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]: ...
 
 
@@ -145,14 +152,22 @@ def candidate_union(
     *rankings: Sequence[Mapping[str, Any]],
     candidate_limit: int,
 ) -> list[dict[str, Any]]:
-    """Return a stable deduplicated pool from first-stage result lists."""
+    """Interleave ranked lists into a stable, deduplicated candidate pool."""
     if candidate_limit < 1:
         raise ValueError("candidate_limit must be positive.")
     candidates: dict[str, dict[str, Any]] = {}
-    for ranking in rankings:
-        for row in ranking[:candidate_limit]:
-            candidates[_row_identity(row)] = dict(row)
-    return [candidates[key] for key in sorted(candidates)]
+    for rank in range(max((len(ranking) for ranking in rankings), default=0)):
+        for ranking in rankings:
+            if rank >= len(ranking):
+                continue
+            row = ranking[rank]
+            identity = _row_identity(row)
+            if identity in candidates:
+                continue
+            if len(candidates) == candidate_limit:
+                return list(candidates.values())
+            candidates[identity] = dict(row)
+    return list(candidates.values())
 
 
 class EmbeddingReranker:
@@ -231,6 +246,9 @@ class DocumentRetriever:
         document_version: str | None = None,
         strategy: str | None = None,
         candidate_limit: int | None = None,
+        chunking_configuration: Mapping[str, Any] | None = None,
+        document_ids: Sequence[str] | None = None,
+        document_versions: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]:
         if limit < 1:
             raise ValueError("limit must be positive.")
@@ -241,57 +259,113 @@ class DocumentRetriever:
         )
         if candidate_pool_limit < 1:
             raise ValueError("candidate_limit must be positive.")
+        if chunking_configuration is not None and strategy is None:
+            raise ValueError(
+                "A strategy is required when filtering by chunking configuration."
+            )
+        if chunking_configuration is not None and strategy is not None:
+            validate_chunking_configuration(strategy, chunking_configuration)
         if method == "bm25":
             candidates = self.repository.list_candidates(
-                limit=candidate_pool_limit,
+                limit=candidate_pool_limit + 1,
                 document_id=document_id,
                 document_version=document_version,
                 strategy=strategy,
+                chunking_configuration=chunking_configuration,
+                document_ids=document_ids,
+                document_versions=document_versions,
             )
-            return bm25_rank(query, candidates, limit)
+            truncated = len(candidates) > candidate_pool_limit
+            ranked = bm25_rank(query, candidates[:candidate_pool_limit], limit)
+            return _with_candidate_coverage(
+                ranked, len(candidates), candidate_pool_limit, truncated
+            )
 
         if embedding is None:
             raise ValueError(f"An embedding is required for {method} retrieval.")
         dense_candidates = self.repository.search_similar(
             embedding,
-            limit=max(limit, candidate_pool_limit) if method != "dense" else limit,
+            limit=max(limit, candidate_pool_limit) + 1 if method != "dense" else limit,
             document_id=document_id,
             document_version=document_version,
             strategy=strategy,
+            chunking_configuration=chunking_configuration,
+            document_ids=document_ids,
+            document_versions=document_versions,
         )
         if method == "dense":
             return dense_candidates[:limit]
         if method == "rrf":
             lexical_candidates = self.repository.list_candidates(
-                limit=candidate_pool_limit,
+                limit=candidate_pool_limit + 1,
                 document_id=document_id,
                 document_version=document_version,
                 strategy=strategy,
+                chunking_configuration=chunking_configuration,
+                document_ids=document_ids,
+                document_versions=document_versions,
             )
-            lexical = bm25_rank(query, lexical_candidates, candidate_pool_limit)
-            return reciprocal_rank_fusion(
+            truncated = (
+                len(dense_candidates) > candidate_pool_limit
+                or len(lexical_candidates) > candidate_pool_limit
+            )
+            observed_count = max(len(dense_candidates), len(lexical_candidates))
+            dense_candidates = dense_candidates[:candidate_pool_limit]
+            lexical = bm25_rank(
+                query, lexical_candidates[:candidate_pool_limit], candidate_pool_limit
+            )
+            ranked = reciprocal_rank_fusion(
                 dense_candidates,
                 lexical,
                 limit=limit,
                 rrf_constant=self.rrf_constant,
             )
+            return _with_candidate_coverage(
+                ranked,
+                observed_count,
+                candidate_pool_limit,
+                truncated,
+            )
 
         lexical_candidates = self.repository.list_candidates(
-            limit=candidate_pool_limit,
+            limit=candidate_pool_limit + 1,
             document_id=document_id,
             document_version=document_version,
             strategy=strategy,
+            chunking_configuration=chunking_configuration,
+            document_ids=document_ids,
+            document_versions=document_versions,
         )
-        lexical = bm25_rank(query, lexical_candidates, candidate_pool_limit)
-        return self.reranker.rerank(
+        truncated = (
+            len(dense_candidates) > candidate_pool_limit
+            or len(lexical_candidates) > candidate_pool_limit
+        )
+        observed_count = max(len(dense_candidates), len(lexical_candidates))
+        dense_candidates = dense_candidates[:candidate_pool_limit]
+        lexical = bm25_rank(
+            query, lexical_candidates[:candidate_pool_limit], candidate_pool_limit
+        )
+        rerank_candidates = candidate_union(
+            dense_candidates,
+            lexical,
+            candidate_limit=candidate_pool_limit + 1,
+        )
+        union_truncated = len(rerank_candidates) > candidate_pool_limit
+        rerank_candidates = rerank_candidates[:candidate_pool_limit]
+        ranked = self.reranker.rerank(
             query,
-            candidate_union(
-                dense_candidates,
-                lexical,
-                candidate_limit=candidate_pool_limit,
-            ),
+            rerank_candidates,
             limit,
             query_embedding=embedding,
+        )
+        return _with_candidate_coverage(
+            ranked,
+            max(
+                observed_count,
+                candidate_pool_limit + 1 if union_truncated else 0,
+            ),
+            candidate_pool_limit,
+            truncated or union_truncated,
         )
 
 
@@ -300,6 +374,17 @@ def _row_identity(row: Mapping[str, Any]) -> str:
     if identity is None:
         raise ValueError("Retrieval rows require a chunk_id or id.")
     return str(identity)
+
+
+def _with_candidate_coverage(
+    rows: list[dict[str, Any]], observed_count: int, limit: int, truncated: bool
+) -> list[dict[str, Any]]:
+    coverage = {
+        "candidate_pool_observed_count": min(observed_count, limit + 1),
+        "candidate_pool_limit": limit,
+        "candidate_pool_truncated": truncated,
+    }
+    return [{**row, **coverage} for row in rows]
 
 
 class FAQRetrieval:

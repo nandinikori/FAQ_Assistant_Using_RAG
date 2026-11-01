@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from psycopg2.extras import Json
 
 from app.chunking.types import DocumentChunk
+from app.chunking.configuration import metadata_configuration_filter
 from app.config.settings import Settings
 from app.infrastructure.database import DatabaseClient
 
@@ -210,6 +211,9 @@ class DocumentChunkRepository:
         document_id: str | None = None,
         document_version: str | None = None,
         strategy: str | None = None,
+        chunking_configuration: Mapping[str, Any] | None = None,
+        document_ids: Sequence[str] | None = None,
+        document_versions: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Return nearest chunks, optionally restricted to a document/version."""
         if limit < 1:
@@ -239,6 +243,25 @@ class DocumentChunkRepository:
         if strategy is not None:
             filters.append("strategy = %s")
             params.append(strategy)
+        if chunking_configuration is not None:
+            if strategy is None:
+                raise ValueError(
+                    "A strategy is required when filtering by chunking configuration."
+                )
+            filters.append("chunking_configuration @> %s::jsonb")
+            params.append(
+                Json(metadata_configuration_filter(strategy, chunking_configuration))
+            )
+        if document_ids is not None:
+            if not document_ids:
+                return []
+            filters.append("document_id = ANY(%s)")
+            params.append(list(document_ids))
+        if document_versions is not None:
+            if not document_versions:
+                return []
+            filters.append("document_version = ANY(%s)")
+            params.append(list(document_versions))
         query_params = [vector, *params, vector, limit]
         query = f"""
             SELECT chunk_id, document_id, document_version, source_name,
@@ -263,6 +286,9 @@ class DocumentChunkRepository:
         document_id: str | None = None,
         document_version: str | None = None,
         strategy: str | None = None,
+        chunking_configuration: Mapping[str, Any] | None = None,
+        document_ids: Sequence[str] | None = None,
+        document_versions: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Load a bounded, configuration-filtered pool for lexical retrieval."""
         if limit < 1:
@@ -286,6 +312,25 @@ class DocumentChunkRepository:
         if strategy is not None:
             filters.append("strategy = %s")
             params.append(strategy)
+        if chunking_configuration is not None:
+            if strategy is None:
+                raise ValueError(
+                    "A strategy is required when filtering by chunking configuration."
+                )
+            filters.append("chunking_configuration @> %s::jsonb")
+            params.append(
+                Json(metadata_configuration_filter(strategy, chunking_configuration))
+            )
+        if document_ids is not None:
+            if not document_ids:
+                return []
+            filters.append("document_id = ANY(%s)")
+            params.append(list(document_ids))
+        if document_versions is not None:
+            if not document_versions:
+                return []
+            filters.append("document_version = ANY(%s)")
+            params.append(list(document_versions))
         params.append(limit)
         query = f"""
             SELECT chunk_id, document_id, document_version, source_name,

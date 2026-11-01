@@ -1,5 +1,7 @@
 import re
 
+import pytest
+
 from app.chunking.corpus import load_policy_corpus
 from app.chunking.evaluation import evaluate_chunks
 from app.chunking.markdown import parse_markdown
@@ -58,12 +60,33 @@ def test_token_window_honors_window_overlap_and_can_use_injected_offsets():
         chunk_size=3,
         overlap=1,
         token_spans=lambda text: [(match.start(), match.end()) for match in re.finditer(r"\S+", text)],
+        tokenizer_id="whitespace-v1",
     )
 
     chunks = chunker.chunk(document)
 
     assert [chunk.text for chunk in chunks] == ["one two three", "three four five"]
-    assert all(chunk.metadata["tokenizer"] == "injected-offset-tokenizer" for chunk in chunks)
+    assert all(chunk.metadata["tokenizer"] == "whitespace-v1" for chunk in chunks)
+
+
+def test_custom_tokenizer_with_captured_configuration_requires_stable_identity():
+    def tokenizer_for(delimiter):
+        def tokenize(text):
+            return [(match.start(), match.end()) for match in re.finditer(delimiter, text)]
+
+        return tokenize
+
+    comma_tokenizer = tokenizer_for(",")
+    space_tokenizer = tokenizer_for(" ")
+
+    with pytest.raises(ValueError, match="explicit stable identity"):
+        TokenWindowChunker(token_spans=comma_tokenizer)
+
+    assert TokenWindowChunker(
+        token_spans=comma_tokenizer, tokenizer_id="comma-v1"
+    ).tokenizer_id != TokenWindowChunker(
+        token_spans=space_tokenizer, tokenizer_id="space-v1"
+    ).tokenizer_id
 
 
 def test_table_aware_chunking_repeats_headers_and_keeps_row_provenance():
@@ -124,7 +147,12 @@ def test_semantic_chunker_splits_on_injected_low_similarity():
     def always_different(left, right):
         return 0.0 * (len(left) + len(right))
 
-    chunker = SemanticChunker(similarity=always_different, threshold=0.5, max_tokens=100)
+    chunker = SemanticChunker(
+        similarity=always_different,
+        threshold=0.5,
+        max_tokens=100,
+        similarity_id="test-always-different-v1",
+    )
 
     chunks = chunker.chunk(document)
 
@@ -138,6 +166,7 @@ def test_semantic_chunker_falls_back_to_token_boundaries_for_oversized_blocks():
     chunks = SemanticChunker(
         lambda left, right: 1.0 + 0.0 * (len(left) + len(right)),
         max_tokens=6,
+        similarity_id="test-constant-similarity-v1",
     ).chunk(document)
 
     assert chunks

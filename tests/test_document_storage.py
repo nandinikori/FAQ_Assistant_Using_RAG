@@ -1,4 +1,5 @@
 import sys
+from contextlib import nullcontext
 from types import ModuleType, SimpleNamespace
 
 import pytest
@@ -201,3 +202,86 @@ def test_gemini_embedding_client_sends_configured_model_and_dimensions(monkeypat
     assert captured["model"] == "test-embedding-model"
     assert captured["contents"] == "test text"
     assert captured["config"].output_dimensionality == 3
+
+
+def test_repository_propagates_complete_configuration_and_scope_filters():
+    class RecordingCursor:
+        def __init__(self):
+            self.calls = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def execute(self, query, params):
+            self.calls.append((query, params))
+
+        def fetchall(self):
+            return []
+
+    class RecordingConnection:
+        def __init__(self):
+            self.recording_cursor = RecordingCursor()
+
+        def cursor(self):
+            return self.recording_cursor
+
+    class RecordingDatabase:
+        def __init__(self):
+            self.connection = RecordingConnection()
+
+        def connect(self):
+            return nullcontext(self.connection)
+
+    database = RecordingDatabase()
+    settings = Settings(
+        gemini_api_key="test-key",
+        embedding_dimensions=3,
+    )
+    repository = DocumentChunkRepository(database, settings)
+    configuration = {"max_tokens": 80}
+    scope_ids = ["policy-a", "policy-b"]
+    scope_versions = ["1.0", "2.0"]
+
+    repository.search_similar(
+        [1.0, 0.0, 0.0],
+        limit=5,
+        strategy="structure-aware",
+        chunking_configuration=configuration,
+        document_ids=scope_ids,
+        document_versions=scope_versions,
+    )
+    repository.list_candidates(
+        limit=5,
+        strategy="structure-aware",
+        chunking_configuration=configuration,
+        document_ids=scope_ids,
+        document_versions=scope_versions,
+    )
+
+    search_query, search_params = database.connection.recording_cursor.calls[0]
+    lexical_query, lexical_params = database.connection.recording_cursor.calls[1]
+    for query in (search_query, lexical_query):
+        assert "chunking_configuration @> %s::jsonb" in query
+        assert "document_id = ANY(%s)" in query
+        assert "document_version = ANY(%s)" in query
+    for params in (search_params, lexical_params):
+        assert any(
+            getattr(param, "adapted", None) == {"configured_max_tokens": 80}
+            for param in params
+        )
+        assert scope_ids in params
+        assert scope_versions in params
+
+
+def test_repository_requires_strategy_for_configuration_filter():
+    settings = Settings(gemini_api_key="test-key", embedding_dimensions=3)
+    repository = DocumentChunkRepository(object(), settings)
+
+    with pytest.raises(ValueError, match="A strategy is required"):
+        repository.search_similar(
+            [1.0, 0.0, 0.0],
+            chunking_configuration={"max_tokens": 80},
+        )
