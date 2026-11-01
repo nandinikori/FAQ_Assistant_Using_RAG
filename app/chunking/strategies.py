@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import marshal
 import re
 from collections.abc import Callable, Sequence
 
@@ -21,6 +22,28 @@ def _tokens(text: str) -> list[re.Match[str]]:
 
 def _token_count(text: str) -> int:
     return len(_tokens(text))
+
+
+def _callable_identity(callback: Callable[..., object]) -> str:
+    module = getattr(callback, "__module__", type(callback).__module__)
+    qualified_name = getattr(callback, "__qualname__", type(callback).__qualname__)
+    code = getattr(callback, "__code__", None)
+    if code is None:
+        raise ValueError(
+            "Stateful or non-function callbacks require an explicit stable identity."
+        )
+    if (
+        callback.__closure__
+        or code.co_freevars
+        or callback.__defaults__
+        or callback.__kwdefaults__
+    ):
+        raise ValueError(
+            "Callbacks with captured or default configuration require an "
+            "explicit stable identity."
+        )
+    code_digest = hashlib.sha256(marshal.dumps(code)).hexdigest()[:16]
+    return f"{module}:{qualified_name}:{code_digest}"
 
 
 def _chunk(
@@ -112,6 +135,8 @@ def _table_row_chunks(
     strategy: str,
     ordinal_start: int,
     source_blocks: Sequence[SourceBlock],
+    *,
+    extra_metadata: dict | None = None,
 ) -> list[DocumentChunk]:
     header = str(block.metadata["table_header"])
     header_tokens = _token_count(header)
@@ -128,6 +153,7 @@ def _table_row_chunks(
                 metadata={
                     "table_headers": block.metadata["headers"],
                     "configured_max_tokens": max_tokens,
+                    **(extra_metadata or {}),
                 },
             )
         ]
@@ -143,6 +169,7 @@ def _table_row_chunks(
                 document, block, header, rows, spans, batch_rows, max_tokens, strategy,
                     ordinal_start + len(chunks),
                 source_blocks,
+                extra_metadata,
             )
             )
             batch_rows = []
@@ -156,6 +183,7 @@ def _table_row_chunks(
                 document, block, header, rows, spans, batch_rows, max_tokens, strategy,
                 ordinal_start + len(chunks),
                 source_blocks,
+                extra_metadata,
             )
         )
     return chunks
@@ -172,6 +200,7 @@ def _emit_table_batch(
     strategy: str,
     ordinal: int,
     source_blocks: Sequence[SourceBlock],
+    extra_metadata: dict | None = None,
 ) -> DocumentChunk:
     first, last = indices[0], indices[-1]
     text = "\n".join([header, *(rows[index] for index in indices)])
@@ -196,6 +225,7 @@ def _emit_table_batch(
             "table_row_end": last + 1,
             "repeated_table_header": True,
             "configured_max_tokens": max_tokens,
+            **(extra_metadata or {}),
         },
     )
 
@@ -213,6 +243,7 @@ class TokenWindowChunker:
         chunk_size: int = 120,
         overlap: int = 20,
         token_spans: Callable[[str], Sequence[tuple[int, int]]] | None = None,
+        tokenizer_id: str | None = None,
     ):
         if chunk_size < 1:
             raise ValueError("chunk_size must be positive.")
@@ -221,6 +252,11 @@ class TokenWindowChunker:
         self.chunk_size = chunk_size
         self.overlap = overlap
         self.token_spans = token_spans
+        if tokenizer_id is not None and not tokenizer_id.strip():
+            raise ValueError("tokenizer_id must be a non-empty stable identity.")
+        if token_spans is not None and tokenizer_id is None:
+            tokenizer_id = _callable_identity(token_spans)
+        self.tokenizer_id = tokenizer_id or "unicode-lexical-approximation"
 
     def chunk(
         self,
@@ -255,11 +291,7 @@ class TokenWindowChunker:
                     metadata={
                         "configured_chunk_size": self.chunk_size,
                         "configured_overlap": self.overlap,
-                        "tokenizer": (
-                            "injected-offset-tokenizer"
-                            if self.token_spans is not None
-                            else "unicode-lexical-approximation"
-                        ),
+                        "tokenizer": self.tokenizer_id,
                     },
                     token_count=end - start,
                 )
@@ -607,6 +639,7 @@ class SemanticChunker:
         similarity: Callable[[str, str], float],
         threshold: float = 0.35,
         max_tokens: int = 180,
+        similarity_id: str | None = None,
     ):
         if not -1 <= threshold <= 1:
             raise ValueError("threshold must be between -1 and 1.")
@@ -615,6 +648,11 @@ class SemanticChunker:
         self.similarity = similarity
         self.threshold = threshold
         self.max_tokens = max_tokens
+        if similarity_id is not None and not similarity_id.strip():
+            raise ValueError("similarity_id must be a non-empty stable identity.")
+        if similarity_id is None:
+            similarity_id = _callable_identity(similarity)
+        self.similarity_id = similarity_id
 
     def chunk(
         self,
@@ -639,6 +677,10 @@ class SemanticChunker:
                     _table_row_chunks(
                         document, block, self.max_tokens, "semantic", len(chunks),
                         blocks,
+                        extra_metadata={
+                            "threshold": self.threshold,
+                            "similarity_id": self.similarity_id,
+                        },
                     )
                 )
                 continue
@@ -664,6 +706,8 @@ class SemanticChunker:
                             metadata={
                                 "boundary_signal": "token-limit-fallback",
                                 "configured_max_tokens": self.max_tokens,
+                                "threshold": self.threshold,
+                                "similarity_id": self.similarity_id,
                             },
                             token_count=end - start,
                         )
@@ -709,6 +753,7 @@ class SemanticChunker:
                 metadata={
                     "boundary_signal": "injected-similarity-callback",
                     "threshold": self.threshold,
+                    "similarity_id": self.similarity_id,
                     "configured_max_tokens": self.max_tokens,
                 },
             )

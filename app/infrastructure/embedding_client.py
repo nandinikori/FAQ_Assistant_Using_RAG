@@ -19,6 +19,7 @@ class GeminiEmbeddingClient:
         self.model = settings.gemini_embedding_model
         self.dimensions = settings.embedding_dimensions
         self.configuration_version = settings.embedding_configuration_version
+        self.last_usage_metadata: dict[str, int] | None = None
         if not settings.gemini_api_key:
             raise ValueError("GEMINI_API_KEY is missing. Add it to your .env file.")
 
@@ -44,6 +45,22 @@ class GeminiEmbeddingClient:
         if not embeddings:
             raise RuntimeError("No embedding returned by Gemini.")
 
+        usage = getattr(response, "usage_metadata", None)
+        self.last_usage_metadata = None
+        if usage is not None:
+            usage_values = {
+                name: getattr(usage, name, None)
+                for name in (
+                    "prompt_token_count",
+                    "total_token_count",
+                    "cached_content_token_count",
+                )
+            }
+            self.last_usage_metadata = {
+                name: value
+                for name, value in usage_values.items()
+                if isinstance(value, int) and not isinstance(value, bool)
+            }
         return embeddings[0].values
 
     def generate_embeddings(self, texts: Sequence[str]) -> list[list[float]]:

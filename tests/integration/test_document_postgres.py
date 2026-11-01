@@ -110,6 +110,9 @@ def test_postgres_document_ingestion_retrieval_and_provenance():
         assert v2_ingestion.inserted_count == 1
         assert len(stored_chunk_ids("1.0")) == 1
         assert len(stored_chunk_ids("2.0")) == 1
+        query_embedding = embeddings.generate_embedding(
+            "How many days may remote employees work at home?"
+        )
 
         changed_chunker_result = ingestion.ingest(
             v1, StructureAwareChunker(max_tokens=99)
@@ -119,6 +122,27 @@ def test_postgres_document_ingestion_retrieval_and_provenance():
             first_ingestion.chunk_ids
         )
         assert len(stored_chunk_ids("1.0")) == 2
+        filtered_config = repository.search_similar(
+            query_embedding,
+            limit=100,
+            document_id=document_id,
+            document_version="1.0",
+            strategy="structure-aware",
+            chunking_configuration={"max_tokens": 99},
+        )
+        assert filtered_config
+        assert all(
+            row["chunking_configuration"]["configured_max_tokens"] == 99
+            for row in filtered_config
+        )
+        assert not repository.search_similar(
+            query_embedding,
+            limit=100,
+            document_id=document_id,
+            document_version="1.0",
+            strategy="structure-aware",
+            chunking_configuration={"max_tokens": 98},
+        )
         ingestion.ingest(v1, ParentChildChunker())
 
         query_embedding = embeddings.generate_embedding(

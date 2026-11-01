@@ -1,78 +1,391 @@
-[
-  {
-    "id": "remote-work-v1-remote-days",
-    "question": "How many days per week may an eligible employee work remotely under version 1.0?",
-    "document_id": "remote-work",
-    "document_version": "1.0",
-    "required_evidence": [
-      "up to two days per week",
-      "with manager approval"
+{
+  "schema_version": 2,
+  "coordinate_convention": "One-based inclusive Markdown source lines; evidence text must occur verbatim inside the indicated lines. Runtime derives zero-based half-open character offsets from the exact text.",
+  "split_manifest": {
+    "version": "grouped-v1",
+    "dev_groups": [
+      "remote-v2-days",
+      "remote-v2-exception",
+      "remote-version-days",
+      "remote-v1-exception",
+      "remote-version-exceptions",
+      "remote-multi-security",
+      "travel-unanswerable-airfare",
+      "travel-unanswerable-airfare-variant",
+      "remote-unanswerable-stipend"
+    ],
+    "held_out_groups": [
+      "remote-v2-availability",
+      "travel-multi-deadlines",
+      "travel-tier-b",
+      "remote-v1-core-hours",
+      "remote-table-roles",
+      "travel-domestic",
+      "travel-booking",
+      "travel-tier-a",
+      "remote-unanswerable-relocation"
     ]
   },
-  {
-    "id": "remote-work-v2-remote-days",
-    "question": "How many days per week may an eligible employee work remotely under version 2.0?",
-    "document_id": "remote-work",
-    "document_version": "2.0",
-    "required_evidence": [
-      "up to three days each week",
-      "after onboarding and manager approval"
-    ]
-  },
-  {
-    "id": "remote-work-v2-core-hours",
-    "question": "When must remote employees be reachable under the current policy?",
-    "document_id": "remote-work",
-    "document_version": "2.0",
-    "required_evidence": [
-      "during team core hours agreed in writing by the manager"
-    ]
-  },
-  {
-    "id": "remote-work-v1-exception-approval",
-    "question": "Who may approve a temporary remote-work exception, and what is one qualifying reason?",
-    "document_id": "remote-work",
-    "document_version": "1.0",
-    "required_evidence": [
-      "People Operations may approve a temporary exception",
-      "disability accommodation"
-    ]
-  },
-  {
-    "id": "remote-work-v2-exception-expiration",
-    "question": "What additional information must be included in an approved temporary exception under version 2.0?",
-    "document_id": "remote-work",
-    "document_version": "2.0",
-    "required_evidence": [
-      "review date, and expiration date"
-    ]
-  },
-  {
-    "id": "travel-expense-tier-b-limit",
-    "question": "What are the lodging and meal reimbursement ceilings for international tier B?",
-    "document_id": "travel-expense",
-    "document_version": "1.0",
-    "required_evidence": [
-      "International tier B | USD 240 | USD 70 | USD 25"
-    ]
-  },
-  {
-    "id": "travel-expense-receipts",
-    "question": "When are receipts required under the travel and expense policy?",
-    "document_id": "travel-expense",
-    "document_version": "1.0",
-    "required_evidence": [
-      "for every lodging claim",
-      "above the stated threshold"
-    ]
-  },
-  {
-    "id": "travel-expense-report-deadline",
-    "question": "How soon after a trip must an expense report be submitted?",
-    "document_id": "travel-expense",
-    "document_version": "1.0",
-    "required_evidence": [
-      "within 15 calendar days after the trip"
-    ]
-  }
-]
+  "groups": [
+    {
+      "group_id": "remote-v2-days",
+      "split": "dev",
+      "category": "prose_fact",
+      "answerability": "answerable",
+      "reference_answer": "Eligible employees may work remotely up to three days each week after onboarding and manager approval.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": {"document_id": "remote-work", "version": "2.0"},
+        "corpus_wide": {"document_ids": ["remote-work", "travel-expense"], "document_versions": null}
+      },
+      "gold_evidence": [
+        {"document_id": "remote-work", "document_version": "2.0", "source_path": "remote_work_v2.md", "line_start": 9, "line_end": 9, "text": "Eligible employees may work remotely up to three days each week after onboarding and manager approval. Site-dependent roles follow the schedule published by their department."}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "remote-v2-days-a", "question": "How many remote days are allowed each week after onboarding?"},
+        {"id": "remote-v2-days-b", "question": "What weekly remote-work schedule can an eligible employee use under policy 2.0?"}
+      ]
+    },
+    {
+      "group_id": "travel-tier-b",
+      "split": "held_out",
+      "category": "table_exact_identifier",
+      "answerability": "answerable",
+      "reference_answer": "International tier B has a lodging ceiling of USD 240 per night and a meals ceiling of USD 70 per day.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": {"document_id": "travel-expense", "version": "1.0"},
+        "corpus_wide": {"document_ids": ["remote-work", "travel-expense"], "document_versions": null}
+      },
+      "gold_evidence": [
+        {"document_id": "travel-expense", "document_version": "1.0", "source_path": "travel_expense_v1.md", "line_start": 15, "line_end": 15, "text": "| Region | Lodging per night | Meals per day | Receipt threshold |"},
+        {"document_id": "travel-expense", "document_version": "1.0", "source_path": "travel_expense_v1.md", "line_start": 19, "line_end": 19, "text": "| International tier B | USD 240 | USD 70 | USD 25 |"}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "travel-tier-b-a", "question": "What are the per-night lodging and per-day meal limits for international tier B?"},
+        {"id": "travel-tier-b-b", "question": "For FIN-022 tier B, what exact USD ceilings apply to lodging and meals?"}
+      ]
+    },
+    {
+      "group_id": "remote-v2-exception",
+      "split": "dev",
+      "category": "exception",
+      "answerability": "answerable",
+      "reference_answer": "People Operations may approve an exception for disability accommodation, caregiving disruption, or a documented site closure. It must include an owner, reason, approval date, review date, and expiration date.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": {"document_id": "remote-work", "version": "2.0"},
+        "corpus_wide": {"document_ids": ["remote-work", "travel-expense"], "document_versions": null}
+      },
+      "gold_evidence": [
+        {"document_id": "remote-work", "document_version": "2.0", "source_path": "remote_work_v2.md", "line_start": 23, "line_end": 23, "text": "People Operations may approve a temporary exception for disability accommodation, caregiving disruption, or a documented site closure. A manager cannot waive security requirements. Exceptions must include an owner, reason, approval date, review date, and expiration date."}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "remote-v2-exception-a", "question": "Who can approve temporary remote-work exceptions, and what must the exception record contain?"},
+        {"id": "remote-v2-exception-b", "question": "Under the current policy, list the exception approver and required exception details."}
+      ]
+    },
+    {
+      "group_id": "remote-version-days",
+      "split": "dev",
+      "category": "version_difference",
+      "answerability": "answerable",
+      "reference_answer": "Version 1.0 allows up to two days per week with manager approval; version 2.0 allows up to three days each week after onboarding and manager approval.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": null,
+        "corpus_wide": {"document_ids": ["remote-work"], "document_versions": ["1.0", "2.0"]}
+      },
+      "gold_evidence": [
+        {"document_id": "remote-work", "document_version": "1.0", "source_path": "remote_work_v1.md", "line_start": 9, "line_end": 9, "text": "Employees who have completed onboarding may work remotely up to two days per week with manager approval. Roles requiring on-site equipment or direct in-person service may have different schedules."},
+        {"document_id": "remote-work", "document_version": "2.0", "source_path": "remote_work_v2.md", "line_start": 9, "line_end": 9, "text": "Eligible employees may work remotely up to three days each week after onboarding and manager approval. Site-dependent roles follow the schedule published by their department."}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "remote-version-days-a", "question": "How did the weekly remote-days allowance change from version 1.0 to 2.0?"},
+        {"id": "remote-version-days-b", "question": "Compare the eligibility and weekly schedule language in the two remote-work versions."}
+      ]
+    },
+    {
+      "group_id": "travel-multi-deadlines",
+      "split": "held_out",
+      "category": "multiple_passages",
+      "answerability": "answerable",
+      "reference_answer": "Expense reports are due within 15 calendar days after the trip; an employee may appeal a denied expense within 30 calendar days.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": {"document_id": "travel-expense", "version": "1.0"},
+        "corpus_wide": {"document_ids": ["remote-work", "travel-expense"], "document_versions": null}
+      },
+      "gold_evidence": [
+        {"document_id": "travel-expense", "document_version": "1.0", "source_path": "travel_expense_v1.md", "line_start": 23, "line_end": 23, "text": "A department vice president may approve an exception to a reimbursement ceiling before travel when a documented business need exists. An employee may appeal a denied expense within 30 calendar days by attaching the receipt and manager rationale."},
+        {"document_id": "travel-expense", "document_version": "1.0", "source_path": "travel_expense_v1.md", "line_start": 27, "line_end": 27, "text": "Expense reports must be submitted within 15 calendar days after the trip. Finance retains approved reports according to the corporate retention schedule."}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "travel-multi-deadlines-a", "question": "What are the submission deadline for an expense report and the deadline to appeal a denial?"},
+        {"id": "travel-multi-deadlines-b", "question": "How long do employees have to submit trip expenses and to appeal denied expenses?"}
+      ]
+    },
+    {
+      "group_id": "travel-unanswerable-airfare",
+      "split": "dev",
+      "category": "unanswerable",
+      "answerability": "unanswerable",
+      "reference_answer": null,
+      "expected_refusal": "The provided travel policy does not state an airfare reimbursement ceiling.",
+      "retrieval_scope": {
+        "within_document": {"document_id": "travel-expense", "version": "1.0"},
+        "corpus_wide": {"document_ids": ["remote-work", "travel-expense"], "document_versions": null}
+      },
+      "gold_evidence": [],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "travel-unanswerable-airfare-a", "question": "What is the maximum airfare reimbursement under this policy?"},
+        {"id": "travel-unanswerable-airfare-b", "question": "Give the exact airfare ceiling listed in FIN-022."}
+      ]
+    },
+    {
+      "group_id": "remote-v1-core-hours",
+      "split": "held_out",
+      "category": "prose_fact",
+      "answerability": "answerable",
+      "reference_answer": "Under version 1.0, employees must be available during their team's core hours, 10:00–15:00 local time.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": {"document_id": "remote-work", "version": "1.0"},
+        "corpus_wide": {"document_ids": ["remote-work", "travel-expense"], "document_versions": null}
+      },
+      "gold_evidence": [
+        {"document_id": "remote-work", "document_version": "1.0", "source_path": "remote_work_v1.md", "line_start": 19, "line_end": 19, "text": "Employees must remain available during their team's core hours, 10:00–15:00 local time. Company devices must use the approved VPN and screen-lock policy. Confidential records must not be printed or left visible in shared spaces."}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "remote-v1-core-hours-a", "question": "During which hours must staff be available in remote-work policy 1.0?"},
+        {"id": "remote-v1-core-hours-b", "question": "What exact local-time core-hours window is specified by the older policy?"}
+      ]
+    },
+    {
+      "group_id": "remote-table-roles",
+      "split": "held_out",
+      "category": "table_exact_identifier",
+      "answerability": "answerable",
+      "reference_answer": "The version 1.0 table lists standard eligible roles as two days with direct-manager approval and on-site service roles as zero days with department-head approval.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": {"document_id": "remote-work", "version": "1.0"},
+        "corpus_wide": {"document_ids": ["remote-work"], "document_versions": ["1.0"]}
+      },
+      "gold_evidence": [
+        {"document_id": "remote-work", "document_version": "1.0", "source_path": "remote_work_v1.md", "line_start": 11, "line_end": 11, "text": "| Work arrangement | Weekly remote days | Approval |"},
+        {"document_id": "remote-work", "document_version": "1.0", "source_path": "remote_work_v1.md", "line_start": 13, "line_end": 14, "text": "| Standard eligible role | 2 | Direct manager |\n| On-site service role | 0 | Department head |"}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "remote-table-roles-a", "question": "What remote-day counts and approvers does the v1 eligibility table give for standard and on-site roles?"},
+        {"id": "remote-table-roles-b", "question": "Compare the table entries for standard eligible roles and on-site service roles."}
+      ]
+    },
+    {
+      "group_id": "remote-unanswerable-stipend",
+      "split": "dev",
+      "category": "unanswerable",
+      "answerability": "unanswerable",
+      "reference_answer": null,
+      "expected_refusal": "The remote-work policy does not specify a home-office equipment stipend.",
+      "retrieval_scope": {
+        "within_document": {"document_id": "remote-work", "version": "2.0"},
+        "corpus_wide": {"document_ids": ["remote-work"], "document_versions": ["2.0"]}
+      },
+      "gold_evidence": [],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "remote-unanswerable-stipend-a", "question": "How much is the home-office equipment stipend?"},
+        {"id": "remote-unanswerable-stipend-b", "question": "What reimbursement amount does policy 2.0 provide for buying a desk?"}
+      ]
+    },
+    {
+      "group_id": "remote-v2-availability",
+      "split": "held_out",
+      "category": "prose_fact",
+      "answerability": "answerable",
+      "reference_answer": "Employees must be reachable during team core hours agreed in writing by the manager.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": {"document_id": "remote-work", "version": "2.0"},
+        "corpus_wide": {"document_ids": ["remote-work"], "document_versions": ["2.0"]}
+      },
+      "gold_evidence": [
+        {"document_id": "remote-work", "document_version": "2.0", "source_path": "remote_work_v2.md", "line_start": 19, "line_end": 19, "text": "Employees must be reachable during team core hours agreed in writing by the manager. Company devices must use the approved VPN and screen-lock policy. Confidential records must not be printed or left visible in shared spaces."}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "remote-v2-availability-a", "question": "When does the current policy require remote employees to be reachable?"},
+        {"id": "remote-v2-availability-b", "question": "How are employee availability hours determined in version 2.0?"}
+      ]
+    },
+    {
+      "group_id": "travel-domestic",
+      "split": "held_out",
+      "category": "table_exact_identifier",
+      "answerability": "answerable",
+      "reference_answer": "Domestic ceilings are USD 220 for lodging per night, USD 65 for meals per day, and USD 25 for the receipt threshold.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": {"document_id": "travel-expense", "version": "1.0"},
+        "corpus_wide": {"document_ids": ["travel-expense"], "document_versions": ["1.0"]}
+      },
+      "gold_evidence": [
+        {"document_id": "travel-expense", "document_version": "1.0", "source_path": "travel_expense_v1.md", "line_start": 15, "line_end": 15, "text": "| Region | Lodging per night | Meals per day | Receipt threshold |"},
+        {"document_id": "travel-expense", "document_version": "1.0", "source_path": "travel_expense_v1.md", "line_start": 17, "line_end": 17, "text": "| Domestic | USD 220 | USD 65 | USD 25 |"}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "travel-domestic-a", "question": "What are the domestic lodging, meal, and receipt-threshold amounts?"},
+        {"id": "travel-domestic-b", "question": "Give all three exact USD values for the domestic row in the reimbursement table."}
+      ]
+    },
+    {
+      "group_id": "remote-v1-exception",
+      "split": "dev",
+      "category": "exception",
+      "answerability": "answerable",
+      "reference_answer": "People Operations may approve a temporary exception for a disability accommodation, caregiving disruption, or documented site closure. Version 1.0 requires an owner, reason, approval date, and review date.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": {"document_id": "remote-work", "version": "1.0"},
+        "corpus_wide": {"document_ids": ["remote-work"], "document_versions": ["1.0"]}
+      },
+      "gold_evidence": [
+        {"document_id": "remote-work", "document_version": "1.0", "source_path": "remote_work_v1.md", "line_start": 23, "line_end": 23, "text": "People Operations may approve a temporary exception for disability accommodation, caregiving disruption, or a documented site closure. A manager cannot waive security requirements. Exceptions must record an owner, reason, approval date, and review date."}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "remote-v1-exception-a", "question": "Which team can approve an exception in v1, and what information must be recorded?"},
+        {"id": "remote-v1-exception-b", "question": "What are the allowed temporary-exception reasons and required record fields in version 1.0?"}
+      ]
+    },
+    {
+      "group_id": "remote-version-exceptions",
+      "split": "dev",
+      "category": "version_difference",
+      "answerability": "answerable",
+      "reference_answer": "Version 1.0 requires an owner, reason, approval date, and review date; version 2.0 adds an expiration date.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": null,
+        "corpus_wide": {"document_ids": ["remote-work"], "document_versions": ["1.0", "2.0"]}
+      },
+      "gold_evidence": [
+        {"document_id": "remote-work", "document_version": "1.0", "source_path": "remote_work_v1.md", "line_start": 23, "line_end": 23, "text": "People Operations may approve a temporary exception for disability accommodation, caregiving disruption, or a documented site closure. A manager cannot waive security requirements. Exceptions must record an owner, reason, approval date, and review date."},
+        {"document_id": "remote-work", "document_version": "2.0", "source_path": "remote_work_v2.md", "line_start": 23, "line_end": 23, "text": "People Operations may approve a temporary exception for disability accommodation, caregiving disruption, or a documented site closure. A manager cannot waive security requirements. Exceptions must include an owner, reason, approval date, review date, and expiration date."}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "remote-version-exceptions-a", "question": "What required exception field was added in version 2.0?"},
+        {"id": "remote-version-exceptions-b", "question": "Compare the recordkeeping requirements for temporary exceptions in versions 1.0 and 2.0."}
+      ]
+    },
+    {
+      "group_id": "remote-multi-security",
+      "split": "dev",
+      "category": "multiple_passages",
+      "answerability": "answerable",
+      "reference_answer": "Company devices must use the approved VPN and screen-lock policy, and a manager cannot waive security requirements.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": {"document_id": "remote-work", "version": "2.0"},
+        "corpus_wide": {"document_ids": ["remote-work"], "document_versions": ["2.0"]}
+      },
+      "gold_evidence": [
+        {"document_id": "remote-work", "document_version": "2.0", "source_path": "remote_work_v2.md", "line_start": 19, "line_end": 19, "text": "Employees must be reachable during team core hours agreed in writing by the manager. Company devices must use the approved VPN and screen-lock policy. Confidential records must not be printed or left visible in shared spaces."},
+        {"document_id": "remote-work", "document_version": "2.0", "source_path": "remote_work_v2.md", "line_start": 23, "line_end": 23, "text": "People Operations may approve a temporary exception for disability accommodation, caregiving disruption, or a documented site closure. A manager cannot waive security requirements. Exceptions must include an owner, reason, approval date, review date, and expiration date."}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "remote-multi-security-a", "question": "What device protections are mandatory, and can a manager waive them?"},
+        {"id": "remote-multi-security-b", "question": "Identify the required device controls and the exception rule for security requirements."}
+      ]
+    },
+    {
+      "group_id": "travel-unanswerable-airfare-variant",
+      "split": "dev",
+      "category": "unanswerable",
+      "answerability": "unanswerable",
+      "reference_answer": null,
+      "expected_refusal": "The provided travel policy does not state an airfare reimbursement ceiling.",
+      "retrieval_scope": {
+        "within_document": {"document_id": "travel-expense", "version": "1.0"},
+        "corpus_wide": {"document_ids": ["travel-expense"], "document_versions": ["1.0"]}
+      },
+      "gold_evidence": [],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "travel-unanswerable-airfare-c", "question": "Does the policy set a dollar cap for airfare? If so, what is it?"},
+        {"id": "travel-unanswerable-airfare-d", "question": "What is the maximum reimbursable flight cost stated in the travel policy?"}
+      ]
+    },
+    {
+      "group_id": "travel-booking",
+      "split": "held_out",
+      "category": "prose_fact",
+      "answerability": "answerable",
+      "reference_answer": "Business travel must be approved before booking. Employees should use the preferred booking channel and select refundable fares when the additional cost is reasonable.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": {"document_id": "travel-expense", "version": "1.0"},
+        "corpus_wide": {"document_ids": ["travel-expense"], "document_versions": ["1.0"]}
+      },
+      "gold_evidence": [
+        {"document_id": "travel-expense", "document_version": "1.0", "source_path": "travel_expense_v1.md", "line_start": 9, "line_end": 9, "text": "Business travel must be approved before booking. Employees should use the preferred booking channel and select refundable fares when the additional cost is reasonable."}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "travel-booking-a", "question": "When must business travel be approved, and what fare choice is preferred when economical?"},
+        {"id": "travel-booking-b", "question": "What does the policy say about approval before booking and refundable tickets?"}
+      ]
+    },
+    {
+      "group_id": "travel-tier-a",
+      "split": "held_out",
+      "category": "table_exact_identifier",
+      "answerability": "answerable",
+      "reference_answer": "International tier A has a lodging ceiling of USD 300 per night, meals of USD 85 per day, and a USD 25 receipt threshold.",
+      "expected_refusal": null,
+      "retrieval_scope": {
+        "within_document": {"document_id": "travel-expense", "version": "1.0"},
+        "corpus_wide": {"document_ids": ["travel-expense"], "document_versions": ["1.0"]}
+      },
+      "gold_evidence": [
+        {"document_id": "travel-expense", "document_version": "1.0", "source_path": "travel_expense_v1.md", "line_start": 15, "line_end": 15, "text": "| Region | Lodging per night | Meals per day | Receipt threshold |"},
+        {"document_id": "travel-expense", "document_version": "1.0", "source_path": "travel_expense_v1.md", "line_start": 18, "line_end": 18, "text": "| International tier A | USD 300 | USD 85 | USD 25 |"}
+      ],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "travel-tier-a-a", "question": "What are the lodging and meal limits and receipt threshold for international tier A?"},
+        {"id": "travel-tier-a-b", "question": "List the exact reimbursement values for the tier A row."}
+      ]
+    },
+    {
+      "group_id": "remote-unanswerable-relocation",
+      "split": "held_out",
+      "category": "unanswerable",
+      "answerability": "unanswerable",
+      "reference_answer": null,
+      "expected_refusal": "The remote-work policy does not describe an international relocation allowance.",
+      "retrieval_scope": {
+        "within_document": {"document_id": "remote-work", "version": "2.0"},
+        "corpus_wide": {"document_ids": ["remote-work"], "document_versions": ["2.0"]}
+      },
+      "gold_evidence": [],
+      "review_status": "pending_review",
+      "variants": [
+        {"id": "remote-unanswerable-relocation-a", "question": "What relocation allowance does the remote-work policy provide for an international move?"},
+        {"id": "remote-unanswerable-relocation-b", "question": "How much does policy HR-014 pay for moving abroad?"}
+      ]
+    }
+  ]
+}

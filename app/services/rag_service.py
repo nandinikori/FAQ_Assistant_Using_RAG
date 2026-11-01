@@ -6,6 +6,7 @@ answer assembly into a single application-facing workflow.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from app.config.settings import Settings
@@ -55,6 +56,9 @@ class RAGService:
         method: RetrievalMethod = "dense",
         strategy: str | None = None,
         candidate_limit: int = 1000,
+        chunking_configuration: Mapping[str, Any] | None = None,
+        document_ids: Sequence[str] | None = None,
+        document_versions: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Retrieve document chunks with dense, BM25, RRF, or reranked search."""
         if method not in ("dense", "bm25", "rrf", "rerank"):
@@ -74,4 +78,7 @@ class RAGService:
             document_version=document_version,
             strategy=strategy,
             candidate_limit=candidate_limit,
+            chunking_configuration=chunking_configuration,
+            document_ids=document_ids,
+            document_versions=document_versions,
         )
