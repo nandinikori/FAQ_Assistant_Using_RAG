@@ -111,9 +111,40 @@ The bundled pytest suite uses fake embeddings only to verify mechanics. Quality 
 
 ## Results
 
-**No benchmark results are available yet.** Labels are pending review, and no live development or held-out run has been executed during implementation. Consequently no default chunker or retrieval method is selected. Reports contain observed values only; never populate portfolio tables with invented measurements.
+### Exploratory development run — 2026-11-11
 
-After an explicitly authorized live development run, inspect per-query failures and difficult cases in the generated report. At least three observed failures should be described only when the run actually produces them; if fewer occur, report that honestly.
+The development labels loaded successfully, and the evaluator validated their source evidence coordinates and retrieval scopes. All **18 development variants (9 groups) remain `pending_review`**; no labels were marked reviewed. This authorized run therefore used `--exploratory` and its measurements are provisional, not a reviewed-label quality claim. The held-out split was not run.
+
+The corpus-wide comparison used `gemini-embedding-001` (3072 dimensions; `gemini-embedding-v1`), a 1,000-candidate limit, and a 320-token context budget. It covered 18 development variants per configuration/method (12 answerable, 6 unanswerable); evidence metrics below use only the 12 answerable variants. Mean total measured query latency includes all 18 cases and follows the timing boundaries above. It is a single in-memory run, not a production latency estimate.
+
+| Chunker | Method | Evidence Recall@5 | Evidence Recall@10 | MRR@10 | All required @5 | Mean total query latency |
+|---|---|---:|---:|---:|---:|---:|
+| Token-window | Dense | 1.000 | 1.000 | 0.694 | 1.000 | 1.159 s |
+| Token-window | BM25 | 0.958 | 1.000 | 0.781 | 0.917 | 0.478 ms |
+| Token-window | RRF | 1.000 | 1.000 | 0.875 | 1.000 | 1.160 s |
+| Token-window | Embedding rerank | 1.000 | 1.000 | 0.875 | 1.000 | 1.966 s |
+| Recursive | Dense | 1.000 | 1.000 | 0.806 | 1.000 | 1.157 s |
+| Recursive | BM25 | 0.875 | 1.000 | 0.747 | 0.833 | 0.331 ms |
+| Recursive | RRF | 1.000 | 1.000 | 0.729 | 1.000 | 1.158 s |
+| Recursive | Embedding rerank | 1.000 | 1.000 | 0.799 | 1.000 | 2.308 s |
+| Structure-aware | Dense | 1.000 | 1.000 | 0.917 | 1.000 | 1.159 s |
+| Structure-aware | BM25 | 0.792 | 1.000 | 0.557 | 0.750 | 0.343 ms |
+| Structure-aware | RRF | 1.000 | 1.000 | 0.764 | 1.000 | 1.160 s |
+| Structure-aware | Embedding rerank | 1.000 | 1.000 | 0.875 | 1.000 | 2.251 s |
+
+The run made 106 embedding-provider calls and recorded 454 cache hits. Provider token usage was not reported. The report contains per-query timings, evidence ranks, searched versions, and retrieved passages.
+
+### Observed top-five failures
+
+All three examples below were BM25 ranking misses with complete candidate-pool coverage (none was truncated at the candidate limit):
+
+- **Recursive + BM25, `remote-v2-exception-b`:** the only required evidence ranked 8th; Recall@5 was 0 and MRR@10 was 0.125.
+- **Structure-aware + BM25, `remote-version-days-a`:** evidence ranked 5th and 7th; Recall@5 was 0.5 and MRR@10 was 0.2. The version-comparison query did not retrieve both required source passages in the top five.
+- **Token-window + BM25, `remote-version-exceptions-a`:** the two version-specific evidence units ranked 5th and 6th; Recall@5 was 0.5 and MRR@10 was 0.2.
+
+Dense, RRF, and embedding reranking achieved Recall@5 of 1.0 for these development labels across all three chunkers. This small, pending-review set is insufficient to select a default or claim a winner; the BM25 misses also show why first-relevant MRR alone should not stand in for complete evidence coverage.
+
+Machine-readable results and the detailed per-query report are available in [`retrieval-validation.json`](../reports/retrieval-validation/retrieval-validation.json) and [`retrieval-validation.md`](../reports/retrieval-validation/retrieval-validation.md). Their dataset and corpus hashes, git revision, cache/timing measurements, and complete rankings make this run reproducible and auditable.
 
 ## Trade-offs
 
@@ -128,7 +159,7 @@ After an explicitly authorized live development run, inspect per-query failures 
 
 - All corpus documents are synthetic policy examples; results do not establish quality on real enterprise collections.
 - Human review is outstanding for all 36 variants.
-- No live development benchmark has been run, so no winner/default is justified.
+- The live development run is exploratory because labels remain pending human review; no held-out run or default selection is justified.
 - Held-out evaluation is reserved for final release and was not run here.
 - PostgreSQL/pgvector isolation is covered by an opt-in integration test and remains blocked unless a configured instance is available.
 - Unanswerable cases are not a refusal-accuracy benchmark.
