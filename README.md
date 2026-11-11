@@ -23,7 +23,7 @@ The project keeps its original FAQ assistant while adding a versioned policy-doc
 | [Day 2 — Document ingestion and chunking](#day-2-progress) | **Progress:** versioned synthetic policies, seven chunking strategies, provenance, and offline structural comparison. |
 | [Day 3 — Persistent document ingestion and retrieval](#day-3-progress) | **Verified:** idempotent PostgreSQL/pgvector chunk storage, provenance-aware retrieval, explicit version filters, and real database integration tests. |
 | [Day 4 — Chunking and retrieval evaluation](#day-4-progress) | **Evaluation:** dense, BM25 lexical, RRF hybrid, and embedding reranking across seven chunking strategies. |
-| [Day 5 — Retrieval validation](#day-5-progress) | **Implementation ready for validation:** grouped source evidence, separate query scopes, configuration-isolated retrieval, review gates, and reproducible reports. No benchmark results or default are claimed before review and an authorized live development run. |
+| [Day 5 — Retrieval validation](#day-5-progress) | **Exploratory development measurements completed:** source-grounded labels, separate query scopes, review gates, and real-embedding Recall@5/MRR@10/latency reports. Labels remain pending review; no default or held-out result is claimed. |
 
 ## Why this project exists
 
@@ -659,10 +659,10 @@ The bundled labels remain pending human review; `--exploratory` is mandatory unt
 <a id="day-5-progress"></a>
 ### Day 5 — Retrieval validation
 
-**Status: implementation ready for validation; not fully validated.** The 36 source-grounded query variants form 18 grouped split units (18 development and 18 held-out). Every label is `pending_review`. No live benchmark, held-out evaluation, default selection, or PostgreSQL integration run is claimed.
+**Status: exploratory development measurements completed; not fully validated.** The 36 source-grounded query variants form 18 grouped split units (18 development and 18 held-out). Every label remains `pending_review`. An authorized real-embedding development run reports provisional Recall@5, MRR@10, latency, and observed failures. Human label review, held-out evaluation, default selection, and PostgreSQL integration are still outstanding.
 
 The controlled first comparison uses token-window, recursive, and structure-aware chunking with dense, BM25, RRF, and the existing heading-enriched embedding reranker. It reports Evidence Recall@5/@10, MRR@10, and all-required-evidence success@5. Within-document and corpus-wide modes are separate. Corpus-wide filters use only the permitted scope and do not receive the gold target document. BM25's capped candidate pool is reported as incomplete when truncated.
 
-Detailed problem statement, worked example, review checklist, metric definitions, Mermaid flow, limitations, and setup/review/test/benchmark commands are in [`docs/day-05-retrieval-validation.md`](./docs/day-05-retrieval-validation.md).
+Detailed problem statement, worked example, review checklist, metric definitions, Mermaid flow, measured development results, failure analysis, limitations, and setup/review/test/benchmark commands are in [`docs/day-05-retrieval-validation.md`](./docs/day-05-retrieval-validation.md). The generated [JSON report](./reports/retrieval-validation/retrieval-validation.json) and [Markdown report](./reports/retrieval-validation/retrieval-validation.md) include all per-query evidence and timings.
 
 [Back to index](#contents)
